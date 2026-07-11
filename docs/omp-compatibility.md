@@ -1,5 +1,7 @@
 # OMP compatibility
 
+> Language: **English** | [简体中文](zh-CN/omp-compatibility.md)
+
 Status: verified against OMP `16.4.2` on macOS on 2026-07-11, plus the upstream `main` documentation and source files listed below. This is a compatibility record, not a promise that an untested OMP release is writable.
 
 ## What OMP 16.x stores where

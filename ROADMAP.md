@@ -1,5 +1,7 @@
 # Roadmap
 
+> Language: **English** | [简体中文](ROADMAP.zh-CN.md)
+
 ## v0.1.0 — shipped
 
 - [x] OMP 16.x detection and read/write compatibility boundary
@@ -15,6 +17,6 @@
 
 - [ ] Budget alerts, menu bar mode, and background helper
 - [ ] Configuration diff UI and retention controls
-- [ ] Signed, notarized app bundle, DMG, and Homebrew cask
+- [ ] Developer ID signing, notarization, universal DMG, and Homebrew cask
 - [ ] Multi-provider gateway profiles and guided OMP rewiring
 - [ ] UI automation and accessibility test coverage

@@ -1,5 +1,7 @@
 # Architecture
 
+> Language: **English** | [简体中文](zh-CN/architecture.md)
+
 OMP API Manager is a native macOS 14+ SwiftUI application with a testable core library. Views only render state and invoke use cases; they do not invoke processes, mutate YAML, access Keychain, or query storage.
 
 ```mermaid
@@ -24,7 +26,7 @@ flowchart TB
 
 ## Security boundaries
 
-API secrets are stored using `kSecClassGenericPassword` under `com.omp-api-manager`, with account names such as `provider.<id>`. Config files contain a Keychain command reference, never a plaintext key. All diagnostics must redact authorization, query key, and secret header values. The future gateway binds only to `127.0.0.1` and uses a separate random local bearer token.
+API secrets are stored using `kSecClassGenericPassword` under `com.omp-api-manager`, with account names such as `provider.<id>`. Config files contain a Keychain command reference, never a plaintext key. All diagnostics must redact authorization, query key, and secret header values. The gateway binds only to `127.0.0.1` and uses a separate random local bearer token.
 
 ## Compatibility boundary
 

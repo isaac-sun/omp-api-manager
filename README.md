@@ -9,6 +9,17 @@
 </p>
 
 <p align="center">
+  <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/isaac-sun/omp-api-manager">Project home</a> ·
+  <a href="https://github.com/isaac-sun/omp-api-manager/releases">Download</a> ·
+  <a href="#documentation">Documentation</a> ·
+  <a href="https://github.com/isaac-sun/omp-api-manager/discussions">Discussions</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/isaac-sun/omp-api-manager/actions/workflows/build.yml"><img src="https://github.com/isaac-sun/omp-api-manager/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
   <a href="https://github.com/isaac-sun/omp-api-manager/actions/workflows/test.yml"><img src="https://github.com/isaac-sun/omp-api-manager/actions/workflows/test.yml/badge.svg" alt="Test status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="Apache 2.0 license"></a>
@@ -80,6 +91,8 @@ swift test
 - [Configuration safety](docs/configuration-safety.md)
 - [Roadmap](ROADMAP.md)
 - [Changelog](CHANGELOG.md)
+
+Chinese translations are available in [README.zh-CN.md](README.zh-CN.md) and [docs/zh-CN](docs/zh-CN/).
 
 ## Contributing
 

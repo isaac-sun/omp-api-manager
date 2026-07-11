@@ -1,5 +1,7 @@
 # Contributor Covenant Code of Conduct
 
+> Language: **English** | [简体中文](CODE_OF_CONDUCT.zh-CN.md)
+
 ## Our pledge
 
 We pledge to make participation in the OMP API Manager community a harassment-free experience for everyone, regardless of age, body size, disability, ethnicity, gender identity and expression, level of experience, nationality, personal appearance, race, religion, or sexual identity and orientation.
