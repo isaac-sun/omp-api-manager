@@ -16,31 +16,14 @@ public struct GatewayProxyProcessor: Sendable {
     }
 
     public func proxy(_ incoming: GatewayRequest) async throws -> GatewayResponse {
-        guard incoming.headers["authorization"] == "Bearer \(localToken)" else { throw GatewayAuthorizationError.missingOrInvalidToken }
+        let prepared = try prepare(incoming)
         let startedAt = Date()
-        let modelID = GatewayUsageExtractor.modelID(from: incoming.body)
+        let modelID = prepared.modelID
         do {
-            let request = try makeUpstreamRequest(from: incoming)
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await session.data(for: prepared.request)
             guard let http = response as? HTTPURLResponse else { throw ProviderConnectionError.malformedResponse }
-            let usage = GatewayUsageExtractor.usage(from: data, providerType: upstream.providerType)
-            try? await usageRecorder.record(GatewayUsageRecord(
-                providerID: upstream.providerID,
-                modelID: modelID,
-                latencyMilliseconds: milliseconds(since: startedAt),
-                statusCode: http.statusCode,
-                inputTokens: usage?.input,
-                outputTokens: usage?.output,
-                totalTokens: usage?.total,
-                source: usage == nil ? nil : .providerReported,
-                errorCategory: (200..<300).contains(http.statusCode) ? nil : "http_\(http.statusCode)"
-            ))
-            let headers = http.allHeaderFields.reduce(into: [String: String]()) { result, item in
-                if let key = item.key as? String, let value = item.value as? String, key.caseInsensitiveCompare("authorization") != .orderedSame {
-                    result[key] = value
-                }
-            }
-            return GatewayResponse(statusCode: http.statusCode, headers: headers, body: data)
+            try? await record(statusCode: http.statusCode, body: data, modelID: modelID, startedAt: startedAt)
+            return GatewayResponse(statusCode: http.statusCode, headers: responseHeaders(http), body: data)
         } catch {
             try? await usageRecorder.record(GatewayUsageRecord(
                 providerID: upstream.providerID,
@@ -54,6 +37,65 @@ public struct GatewayProxyProcessor: Sendable {
                 errorCategory: "network"
             ))
             throw error
+        }
+    }
+
+    /// Streams bytes unchanged to the local client. Provider usage is parsed only after the stream ends.
+    public func proxyStreaming(_ incoming: GatewayRequest, onResponse: @escaping @Sendable (GatewayResponseHead) -> Void, onChunk: @escaping @Sendable (Data) -> Void) async throws {
+        let prepared = try prepare(incoming)
+        let startedAt = Date()
+        do {
+            let (bytes, response) = try await session.bytes(for: prepared.request)
+            guard let http = response as? HTTPURLResponse else { throw ProviderConnectionError.malformedResponse }
+            onResponse(GatewayResponseHead(statusCode: http.statusCode, headers: responseHeaders(http)))
+            var completeBody = Data()
+            var chunk = Data()
+            chunk.reserveCapacity(8_192)
+            for try await byte in bytes {
+                chunk.append(byte)
+                completeBody.append(byte)
+                if chunk.count >= 8_192 {
+                    onChunk(chunk)
+                    chunk.removeAll(keepingCapacity: true)
+                }
+            }
+            if !chunk.isEmpty { onChunk(chunk) }
+            try? await record(statusCode: http.statusCode, body: completeBody, modelID: prepared.modelID, startedAt: startedAt)
+        } catch {
+            try? await recordFailure(modelID: prepared.modelID, startedAt: startedAt)
+            throw error
+        }
+    }
+
+    private func prepare(_ incoming: GatewayRequest) throws -> (request: URLRequest, modelID: String?) {
+        guard incoming.headers["authorization"] == "Bearer \(localToken)" else { throw GatewayAuthorizationError.missingOrInvalidToken }
+        return (try makeUpstreamRequest(from: incoming), GatewayUsageExtractor.modelID(from: incoming.body))
+    }
+
+    private func record(statusCode: Int, body: Data, modelID: String?, startedAt: Date) async throws {
+        let usage = GatewayUsageExtractor.usage(from: body, providerType: upstream.providerType)
+        try await usageRecorder.record(GatewayUsageRecord(
+            providerID: upstream.providerID,
+            modelID: modelID,
+            latencyMilliseconds: milliseconds(since: startedAt),
+            statusCode: statusCode,
+            inputTokens: usage?.input,
+            outputTokens: usage?.output,
+            totalTokens: usage?.total,
+            source: usage == nil ? nil : .providerReported,
+            errorCategory: (200..<300).contains(statusCode) ? nil : "http_\(statusCode)"
+        ))
+    }
+
+    private func recordFailure(modelID: String?, startedAt: Date) async throws {
+        try await usageRecorder.record(GatewayUsageRecord(providerID: upstream.providerID, modelID: modelID, latencyMilliseconds: milliseconds(since: startedAt), statusCode: nil, inputTokens: nil, outputTokens: nil, totalTokens: nil, source: nil, errorCategory: "network"))
+    }
+
+    private func responseHeaders(_ response: HTTPURLResponse) -> [String: String] {
+        response.allHeaderFields.reduce(into: [String: String]()) { result, item in
+            if let key = item.key as? String, let value = item.value as? String, key.caseInsensitiveCompare("authorization") != .orderedSame {
+                result[key] = value
+            }
         }
     }
 

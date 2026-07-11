@@ -5,11 +5,11 @@
 - [x] OMP 16.x detection and read/write compatibility boundary
 - [x] YAML transaction safety primitives and backups
 - [x] Keychain service abstraction
-- [ ] Provider CRUD and Anthropic-compatible adapter
-- [ ] Full connection test and secure OMP apply flow
-- [ ] Loopback streaming gateway
-- [ ] SQLite usage store, dashboard, and CSV/JSON export
-- [ ] UI and gateway integration tests
+- [x] Provider CRUD and Anthropic-compatible adapter
+- [x] Full connection test and secure OMP apply flow
+- [x] Loopback streaming gateway
+- [x] SQLite usage store, dashboard, and CSV/JSON export
+- [x] UI and gateway integration tests
 
 ## Later
 

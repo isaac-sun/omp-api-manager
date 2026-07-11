@@ -41,6 +41,12 @@ public struct GatewayResponse: Sendable {
     }
 }
 
+public struct GatewayResponseHead: Sendable {
+    public let statusCode: Int
+    public let headers: [String: String]
+    public init(statusCode: Int, headers: [String: String]) { self.statusCode = statusCode; self.headers = headers }
+}
+
 public struct GatewayStatus: Sendable, Equatable {
     public let port: Int
     public let startedAt: Date

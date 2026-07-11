@@ -108,6 +108,9 @@ final class GatewayTests: XCTestCase {
         XCTAssertEqual(restored.modelID, "gpt-test")
         XCTAssertEqual(restored.totalTokens, 12)
         XCTAssertEqual(restored.source, .providerReported)
+        let summary = try await repository.summary(since: .distantPast)
+        XCTAssertEqual(summary.requestCount, 1)
+        XCTAssertEqual(summary.totalTokens, 12)
     }
 
     private func mockSession() -> URLSession {

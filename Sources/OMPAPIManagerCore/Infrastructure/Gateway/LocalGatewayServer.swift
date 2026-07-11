@@ -76,12 +76,16 @@ private final class LocalGatewayHTTPHandler: ChannelInboundHandler, @unchecked S
             let contextBox = GatewayContextBox(context)
             Task { [processor, contextBox, handler = self] in
                 do {
-                    let response = try await processor.proxy(request)
-                    contextBox.context.eventLoop.execute { handler.write(response: response, context: contextBox.context) }
+                    try await processor.proxyStreaming(
+                        request,
+                        onResponse: { head in contextBox.write(head: head, handler: handler) },
+                        onChunk: { chunk in contextBox.write(chunk: chunk, handler: handler) }
+                    )
+                    contextBox.finish(handler: handler)
                 } catch is GatewayAuthorizationError {
-                    contextBox.context.eventLoop.execute { handler.writeError(status: .unauthorized, context: contextBox.context) }
+                    contextBox.finishWithError(status: .unauthorized, handler: handler)
                 } catch {
-                    contextBox.context.eventLoop.execute { handler.writeError(status: .badGateway, context: contextBox.context) }
+                    contextBox.finishWithError(status: .badGateway, handler: handler)
                 }
             }
             self.head = nil
@@ -100,7 +104,23 @@ private final class LocalGatewayHTTPHandler: ChannelInboundHandler, @unchecked S
         context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
     }
 
-    private func writeError(status: HTTPResponseStatus, context: ChannelHandlerContext) {
+    fileprivate func write(head response: GatewayResponseHead, context: ChannelHandlerContext) {
+        let headers = HTTPHeaders(response.headers.map { ($0.key, $0.value) })
+        let head = HTTPResponseHead(version: .http1_1, status: HTTPResponseStatus(statusCode: response.statusCode), headers: headers)
+        context.writeAndFlush(wrapOutboundOut(.head(head)), promise: nil)
+    }
+
+    fileprivate func write(chunk: Data, context: ChannelHandlerContext) {
+        var body = context.channel.allocator.buffer(capacity: chunk.count)
+        body.writeBytes(chunk)
+        context.writeAndFlush(wrapOutboundOut(.body(.byteBuffer(body))), promise: nil)
+    }
+
+    fileprivate func finish(context: ChannelHandlerContext) {
+        context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
+    }
+
+    fileprivate func writeError(status: HTTPResponseStatus, context: ChannelHandlerContext) {
         let response = GatewayResponse(statusCode: Int(status.code), headers: ["content-type": "application/json"], body: Data("{\"error\":\"gateway request failed\"}".utf8))
         write(response: response, context: context)
     }
@@ -108,5 +128,29 @@ private final class LocalGatewayHTTPHandler: ChannelInboundHandler, @unchecked S
 
 private final class GatewayContextBox: @unchecked Sendable {
     let context: ChannelHandlerContext
+    private var wroteHead = false
     init(_ context: ChannelHandlerContext) { self.context = context }
+
+    func write(head: GatewayResponseHead, handler: LocalGatewayHTTPHandler) {
+        context.eventLoop.execute {
+            guard !self.wroteHead else { return }
+            self.wroteHead = true
+            handler.write(head: head, context: self.context)
+        }
+    }
+
+    func write(chunk: Data, handler: LocalGatewayHTTPHandler) {
+        context.eventLoop.execute { guard self.wroteHead else { return }; handler.write(chunk: chunk, context: self.context) }
+    }
+
+    func finish(handler: LocalGatewayHTTPHandler) {
+        context.eventLoop.execute { guard self.wroteHead else { return }; handler.finish(context: self.context) }
+    }
+
+    func finishWithError(status: HTTPResponseStatus, handler: LocalGatewayHTTPHandler) {
+        context.eventLoop.execute {
+            if self.wroteHead { handler.finish(context: self.context) }
+            else { handler.writeError(status: status, context: self.context) }
+        }
+    }
 }

@@ -40,6 +40,6 @@ The planned loopback listener authenticates an OMP request with a distinct local
 
 ## MVP implementation status
 
-Implemented: installation discovery, documented directory resolution, read-only configuration inspection UI, semantic YAML read/update transaction, conflict detection, backups, OMP 16 adapter, Keychain wrapper, validated Keychain-backed provider drafts, a minimal OpenAI-compatible models request, cost calculator, SwiftUI shell, and unit tests.
+Implemented: installation discovery, documented directory resolution, read-only configuration inspection UI, semantic YAML read/update transaction, conflict detection, backups, OMP 16 adapter, Keychain wrapper, validated Keychain-backed provider drafts, OpenAI/Anthropic model discovery and connection testing, loopback SSE Gateway, sanitized SQLite usage persistence, usage dashboard/export, SwiftUI shell, and unit/integration tests.
 
 Planned: provider CRUD persistence, Anthropic adapter, full connection requests, loopback streaming gateway, SQLite usage repository, dashboard, export, UI tests, and release packaging.

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import OMPAPIManagerCore
 
@@ -6,12 +7,44 @@ struct OMPAPIManagerApp: App {
     @StateObject private var configurationViewModel = OMPConfigurationViewModel()
     @StateObject private var providerViewModel = ProviderManagementViewModel()
     @StateObject private var gatewayViewModel = GatewayViewModel()
+    @StateObject private var usageViewModel = UsageDashboardViewModel()
 
     var body: some Scene {
         WindowGroup("OMP API Manager") {
-            ContentView(viewModel: configurationViewModel, providerViewModel: providerViewModel, gatewayViewModel: gatewayViewModel)
+            ContentView(viewModel: configurationViewModel, providerViewModel: providerViewModel, gatewayViewModel: gatewayViewModel, usageViewModel: usageViewModel)
         }
     }
+}
+
+@MainActor
+private final class UsageDashboardViewModel: ObservableObject {
+    @Published private(set) var summary = UsageSummary(requestCount: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0, errorCount: 0, averageLatencyMilliseconds: 0)
+    @Published private(set) var records: [GatewayUsageRecord] = []
+    @Published private(set) var errorMessage: String?
+    private let repository: SQLiteUsageRepository?
+    private let exporter = UsageExporter()
+
+    init() {
+        do { repository = try SQLiteUsageRepository.applicationSupportDefault() }
+        catch { repository = nil; errorMessage = error.localizedDescription }
+    }
+
+    func refresh() async {
+        guard let repository else { return }
+        do {
+            let startOfToday = Calendar.current.startOfDay(for: .now)
+            summary = try await repository.summary(since: startOfToday)
+            records = try await repository.recentUsage(limit: 100)
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func export(_ format: UsageExportFormat) async -> Data? {
+        do { return try exporter.data(records: records, format: format) }
+        catch { errorMessage = error.localizedDescription; return nil }
+    }
+
+    func dismissError() { errorMessage = nil }
+    func reportError(_ error: Error) { errorMessage = error.localizedDescription }
 }
 
 @MainActor
@@ -166,11 +199,12 @@ private final class OMPConfigurationViewModel: ObservableObject {
 }
 
 private struct ContentView: View {
-    private enum Section: Hashable { case overview, providers, configuration }
+    private enum Section: Hashable { case overview, providers, usage, configuration }
 
     @ObservedObject var viewModel: OMPConfigurationViewModel
     @ObservedObject var providerViewModel: ProviderManagementViewModel
     @ObservedObject var gatewayViewModel: GatewayViewModel
+    @ObservedObject var usageViewModel: UsageDashboardViewModel
     @State private var selection: Section? = .overview
 
     var body: some View {
@@ -178,6 +212,7 @@ private struct ContentView: View {
             List(selection: $selection) {
                 Label("Overview", systemImage: "gauge.with.dots.needle.50percent").tag(Section.overview)
                 Label("Providers", systemImage: "server.rack").tag(Section.providers)
+                Label("Usage", systemImage: "chart.bar.xaxis").tag(Section.usage)
                 Label("Configuration", systemImage: "doc.text").tag(Section.configuration)
             }
             .navigationTitle("OMP API Manager")
@@ -186,6 +221,7 @@ private struct ContentView: View {
                 switch selection ?? .overview {
                 case .overview: OverviewView(state: viewModel.state, gatewayViewModel: gatewayViewModel)
                 case .providers: ProvidersView(state: viewModel.state, viewModel: providerViewModel, gatewayViewModel: gatewayViewModel)
+                case .usage: UsageView(viewModel: usageViewModel)
                 case .configuration: ConfigurationView(state: viewModel.state, providerViewModel: providerViewModel)
                 }
             }
@@ -196,6 +232,78 @@ private struct ContentView: View {
             .task { await viewModel.refresh() }
         }
         .frame(minWidth: 860, minHeight: 540)
+    }
+}
+
+private struct UsageView: View {
+    @ObservedObject var viewModel: UsageDashboardViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Usage Today").font(.title2.weight(.semibold))
+            HStack(spacing: 12) {
+                metric("Requests", value: "\(viewModel.summary.requestCount)")
+                metric("Tokens", value: "\(viewModel.summary.totalTokens)")
+                metric("Errors", value: "\(viewModel.summary.errorCount)")
+                metric("Avg latency", value: "\(viewModel.summary.averageLatencyMilliseconds) ms")
+            }
+            List(viewModel.records) { record in
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(record.modelID ?? record.providerID)
+                        Text("\(record.providerID) · \(record.source?.rawValue ?? "usage unavailable")")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(tokenText(for: record)).monospacedDigit()
+                    Text(statusText(for: record))
+                        .foregroundStyle(record.errorCategory == nil ? Color.secondary : Color.red)
+                }
+            }
+        }
+        .padding(24)
+        .navigationTitle("Usage")
+        .toolbar {
+            Button("Refresh", systemImage: "arrow.clockwise") { Task { await viewModel.refresh() } }
+            Menu("Export") {
+                Button("CSV…") { export(.csv) }
+                Button("JSON…") { export(.json) }
+            }
+        }
+        .task { await viewModel.refresh() }
+        .alert("Usage Error", isPresented: Binding(get: { viewModel.errorMessage != nil }, set: { if !$0 { viewModel.dismissError() } })) {
+            Button("OK", role: .cancel) { viewModel.dismissError() }
+        } message: { Text(viewModel.errorMessage ?? "") }
+    }
+
+    private func metric(_ title: String, value: String) -> some View {
+        VStack(alignment: .leading) {
+            Text(value).font(.title3.weight(.semibold)).monospacedDigit()
+            Text(title).font(.caption).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func tokenText(for record: GatewayUsageRecord) -> String {
+        record.totalTokens.map { String($0) } ?? "—"
+    }
+
+    private func statusText(for record: GatewayUsageRecord) -> String {
+        record.statusCode.map { String($0) } ?? "Network error"
+    }
+
+    private func export(_ format: UsageExportFormat) {
+        Task {
+            guard let data = await viewModel.export(format) else { return }
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = "omp-usage.\(format.rawValue)"
+            if panel.runModal() == .OK, let url = panel.url {
+                do { try data.write(to: url, options: .atomic) }
+                catch { viewModel.reportError(error) }
+            }
+        }
     }
 }
 
