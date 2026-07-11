@@ -1,54 +1,92 @@
-# OMP API Manager
+<p align="center">
+  <img src="Sources/OMPAPIManagerApp/Resources/AppIcon-master.png" width="112" alt="OMP API Manager app icon">
+</p>
 
-Native macOS tooling for safely managing OMP custom AI providers and inspecting locally captured usage.
+<h1 align="center">OMP API Manager</h1>
 
-> Status: pre-release foundation. The current codebase builds a macOS SwiftUI shell and implements safe OMP 16.x configuration primitives. Provider persistence, gateway forwarding, usage storage, dashboard, and exports are planned; do not use this version to manage production credentials yet.
+<p align="center">
+  A native, local-first macOS app for safely managing custom OMP AI providers, running a loopback gateway, and inspecting sanitized usage.
+</p>
 
-## What is implemented
+<p align="center">
+  <a href="https://github.com/isaac-sun/omp-api-manager/actions/workflows/build.yml"><img src="https://github.com/isaac-sun/omp-api-manager/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
+  <a href="https://github.com/isaac-sun/omp-api-manager/actions/workflows/test.yml"><img src="https://github.com/isaac-sun/omp-api-manager/actions/workflows/test.yml/badge.svg" alt="Test status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="Apache 2.0 license"></a>
+  <a href="https://github.com/isaac-sun/omp-api-manager/releases"><img src="https://img.shields.io/github/v/release/isaac-sun/omp-api-manager?display_name=tag" alt="Latest release"></a>
+</p>
 
-- OMP 16.x installation and directory discovery (`PI_CODING_AGENT_DIR`, `PI_CONFIG_DIR`, then `~/.omp/agent`).
-- Read-only display of the detected OMP executable/version, configuration paths, YAML state, configured providers, default model, and diagnostics. Unknown OMP versions are read-only.
-- Semantic parsing of `config.yml` and `models.yml` using Yams.
-- OMP 16.x provider mutation with conflict detection, a backup, temporary-file validation, and atomic replacement.
-- Keychain service wrapper; no API key persistence in app models.
-- Provider draft service with validation and Keychain-backed secret storage; provider metadata is stored separately without the secret.
-- OMP 16.x `saveAndApply` service path; unsupported OMP versions retain a draft but reject configuration writes.
-- Advanced, redacted `models.yml` editor service: edits are parsed and transactionally saved; existing secret values are never displayed or replaced by redaction markers.
-- OpenAI-compatible and Anthropic-compatible model discovery plus selected-model connection tests, with local mock coverage and classified provider errors.
-- Loopback Gateway core that accepts a separate local token, retrieves upstream credentials from Keychain, forwards requests to one selected provider, and records sanitized usage metadata in SQLite.
-- Initial OpenAI-compatible endpoint validation and model-list request.
-- Separate provider-reported vs locally-estimated usage source model and pure cost calculation.
-- SwiftUI application shell and core tests.
+> **v0.1.0** is the first developer release. It is currently distributed as source: open `Package.swift` in Xcode or run it with SwiftPM. Signed app bundles, notarization, a DMG, and Homebrew distribution are planned.
 
-## Safety and privacy
+## Why OMP API Manager?
 
-API keys are designed to live in the macOS Keychain. The config adapter emits a Keychain command reference, not the secret. Do not paste secrets in issues, logs, or test fixtures. The current release does not upload telemetry or usage.
+Custom AI providers are useful, but manually editing OMP configuration can risk exposing credentials or overwriting a working setup. OMP API Manager gives macOS users a focused local workspace for provider setup, safe configuration changes, a localhost-only gateway, and private usage visibility.
 
-OMP configuration compatibility is deliberately narrow. Only OMP 16.x is writable; other major versions must be read-only. See [OMP compatibility](docs/omp-compatibility.md) and [configuration safety](docs/configuration-safety.md).
+## Highlights
+
+| Area | What it does |
+| --- | --- |
+| Safe OMP configuration | Detects OMP 16.x, semantically edits YAML, creates backups, checks for conflicts, and writes atomically. Unknown versions are read-only. |
+| Provider management | Supports OpenAI-compatible and Anthropic-compatible endpoints, model discovery, connection testing, drafts, and secure apply. |
+| Credential protection | Stores provider keys in the macOS Keychain; no API key is saved in provider metadata or displayed by the advanced editor. |
+| Local gateway | Starts a `127.0.0.1`-only gateway with a separate local token, substitutes upstream Keychain credentials, and forwards standard and SSE responses. |
+| Private usage dashboard | Stores sanitized request metadata in SQLite and exports CSV or JSON. Prompts, responses, API keys, and authorization headers are never persisted. |
+| Native macOS UI | A SwiftUI workspace for environment status, providers, gateway controls, usage, and a redacted `models.yml` editor. |
 
 ## Requirements
 
-- macOS 14 or later
-- Xcode with Swift 6 (for an app build), or current Swift toolchain for the package tests
-- OMP 16.x is optional for opening the app, but required for configuration integration
+- macOS 14 Sonoma or later
+- Xcode with Swift 6, or a current Swift 6 toolchain
+- OMP 16.x for configuration integration (the app can still open without OMP)
 
-## Build and test
+## Get started
+
+### Run in Xcode
+
+1. Clone this repository.
+2. Open [`Package.swift`](Package.swift) in Xcode.
+3. Select the `OMPAPIManager` executable scheme and press <kbd>⌘R</kbd>.
+4. In **Providers**, add a compatible endpoint. The key is saved only in your macOS Keychain.
+
+### Run from Terminal
 
 ```sh
-swift build
+git clone https://github.com/isaac-sun/omp-api-manager.git
+cd omp-api-manager
+swift run OMPAPIManager
+```
+
+To validate a checkout:
+
+```sh
+swift build -Xswiftc -warnings-as-errors
 swift test
 ```
 
-Open `Package.swift` in Xcode to run the SwiftUI application. A packaged `.xcodeproj`, signing, notarization, DMG, and Homebrew cask are planned.
+## Safety model
 
-## Roadmap
+- Configuration writes are intentionally limited to documented OMP 16.x behavior.
+- Each edit is parsed, protected by a fingerprint conflict check, backed up, and atomically replaced.
+- The advanced editor redacts existing secret values and rejects plaintext secrets.
+- The gateway binds only to localhost and never reuses the upstream provider key as its local token.
+- No telemetry is sent by OMP API Manager. See [Privacy](PRIVACY.md) and [Configuration safety](docs/configuration-safety.md).
 
-See [ROADMAP.md](ROADMAP.md). Gateway forwarding, SQLite analytics, model dashboard, CSV/JSON export, and release automation are not yet implemented.
+## Documentation
 
-## Contributing and security
+- [Architecture](docs/architecture.md)
+- [OMP compatibility](docs/omp-compatibility.md)
+- [Provider adapters](docs/provider-adapters.md)
+- [Gateway design](docs/gateway.md)
+- [Usage tracking and exports](docs/usage-tracking.md)
+- [Configuration safety](docs/configuration-safety.md)
+- [Roadmap](ROADMAP.md)
+- [Changelog](CHANGELOG.md)
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes. Please report vulnerabilities through the private process in [SECURITY.md](SECURITY.md), not public issues.
+## Contributing
+
+Contributions, bug reports, and documentation improvements are welcome. Please begin with [CONTRIBUTING.md](CONTRIBUTING.md), follow the [Code of Conduct](CODE_OF_CONDUCT.md), and use the issue templates when opening a discussion.
+
+Never include API keys, authorization headers, prompts, responses, or real local configuration in an issue or pull request. For vulnerabilities, follow the private process in [SECURITY.md](SECURITY.md).
 
 ## License
 
-Licensed under the [Apache License 2.0](LICENSE).
+Copyright © 2026 OMP API Manager contributors. Licensed under the [Apache License 2.0](LICENSE).

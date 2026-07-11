@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a reproducible problem with OMP API Manager
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Do not include API keys, authorization headers, prompts, responses, or real local configuration.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the actual behavior and its impact.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Safe reproduction steps
+      description: Provide a minimal, sanitized sequence of steps.
+      placeholder: |
+        1. Open …
+        2. Configure …
+        3. Observe …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: App version or commit
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: macOS 14.0
+    validations:
+      required: true
+  - type: dropdown
+    id: omp-version
+    attributes:
+      label: OMP version
+      options:
+        - OMP 16.x
+        - Another version
+        - OMP is not installed
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed credentials and private configuration content from this report.
+          required: true
