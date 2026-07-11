@@ -85,6 +85,27 @@ public actor SQLiteUsageRepository: UsageRecording {
         return records
     }
 
+    public func summary(since: Date) throws -> UsageSummary {
+        let sql = """
+        SELECT COUNT(*), COALESCE(SUM(input_tokens), 0), COALESCE(SUM(output_tokens), 0), COALESCE(SUM(total_tokens), 0),
+               COALESCE(SUM(CASE WHEN error_category IS NOT NULL THEN 1 ELSE 0 END), 0), COALESCE(AVG(latency_ms), 0)
+        FROM usage_records WHERE occurred_at >= ?
+        """
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(handle.pointer, sql, -1, &statement, nil) == SQLITE_OK, let statement else { throw AppError.databaseError }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_double(statement, 1, since.timeIntervalSince1970)
+        guard sqlite3_step(statement) == SQLITE_ROW else { throw AppError.databaseError }
+        return UsageSummary(
+            requestCount: Int(sqlite3_column_int64(statement, 0)),
+            inputTokens: Int(sqlite3_column_int64(statement, 1)),
+            outputTokens: Int(sqlite3_column_int64(statement, 2)),
+            totalTokens: Int(sqlite3_column_int64(statement, 3)),
+            errorCount: Int(sqlite3_column_int64(statement, 4)),
+            averageLatencyMilliseconds: Int(sqlite3_column_double(statement, 5))
+        )
+    }
+
     private static func execute(_ database: OpaquePointer, sql: String) throws {
         guard sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK else { throw AppError.databaseError }
     }
