@@ -29,7 +29,8 @@ let package = Package(
         .executableTarget(
             name: "OMPAPIManagerApp",
             dependencies: ["OMPAPIManagerCore"],
-            path: "Sources/OMPAPIManagerApp"
+            path: "Sources/OMPAPIManagerApp",
+            resources: [.process("Resources")]
         ),
         .testTarget(
             name: "OMPAPIManagerCoreTests",
