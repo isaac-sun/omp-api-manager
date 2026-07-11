@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/isaac-sun/omp-api-manager/security/advisories/new
+    about: Please report vulnerabilities privately. Never include real credentials in a public issue.
+  - name: Documentation
+    url: https://github.com/isaac-sun/omp-api-manager/blob/main/CONTRIBUTING.md
+    about: Read the contributor guide before opening a report or pull request.

@@ -8,8 +8,8 @@ flowchart TB
   Core --> OMP["OMP 16 config adapter"]
   Core --> Provider["Provider adapters"]
   Core --> Vault["Keychain service"]
-  Core --> Gateway["Loopback gateway (planned)"]
-  Core --> Store["Usage repository (planned)"]
+  Core --> Gateway["Loopback gateway"]
+  Core --> Store["SQLite usage repository"]
   OMP --> Files["config.yml / models.yml"]
 ```
 
@@ -30,16 +30,16 @@ API secrets are stored using `kSecClassGenericPassword` under `com.omp-api-manag
 
 `OMPConfigAdapter` isolates OMP schema behavior. `OMP16ConfigAdapter` supports only documented OMP 16.x paths. Unknown OMP versions must be read-only. Provider protocol differences are isolated behind `ProviderAdapter`.
 
-## Planned local database
+## Local database
 
-The future GRDB/SQLite repository will be owned by infrastructure, never views. Initial migrations will create `providers` (non-secret metadata and Keychain account reference), `models` (capabilities/prices/source timestamps), `usage_records` (sanitized timing/status/token metrics and source), and `budgets`. Foreign keys will reference opaque provider and model identifiers. API keys, prompt bodies, response bodies, and authorization headers are excluded by schema.
+The SQLite usage repository is owned by infrastructure, never views. It stores sanitized `usage_records` with timing, status, provider/model identifiers, provider-reported token metadata, and usage source. API keys, prompt bodies, response bodies, and authorization headers are excluded by schema. Provider metadata is stored separately from its Keychain account credential.
 
 ## Gateway data flow
 
-The planned loopback listener authenticates an OMP request with a distinct local token, looks up the upstream credential in Keychain, translates with the selected `ProviderAdapter`, forwards the response, then stores redacted metrics. For streaming responses, final usage is extracted only from the final provider event when supplied. The original response stream passes through unchanged.
+The loopback listener authenticates a request with a distinct local token, looks up the upstream credential in Keychain, forwards it to the selected provider, then stores redacted metrics. Standard responses and SSE byte chunks pass through without persistence. Final usage is extracted only when the provider supplies it.
 
 ## MVP implementation status
 
-Implemented: installation discovery, documented directory resolution, read-only configuration inspection UI, semantic YAML read/update transaction, conflict detection, backups, OMP 16 adapter, Keychain wrapper, validated Keychain-backed provider drafts, OpenAI/Anthropic model discovery and connection testing, loopback SSE Gateway, sanitized SQLite usage persistence, usage dashboard/export, SwiftUI shell, and unit/integration tests.
+Implemented: installation discovery, documented directory resolution, read-only configuration inspection UI, semantic YAML read/update transaction, conflict detection, backups, OMP 16 adapter, Keychain wrapper, validated Keychain-backed provider drafts, OpenAI/Anthropic model discovery and connection testing, loopback SSE gateway, sanitized SQLite usage persistence, usage dashboard/export, and unit/integration tests.
 
-Planned: provider CRUD persistence, Anthropic adapter, full connection requests, loopback streaming gateway, SQLite usage repository, dashboard, export, UI tests, and release packaging.
+Planned: configuration diff and retention controls, multi-provider gateway profiles, UI automation, signing/notarization, and packaged distribution.

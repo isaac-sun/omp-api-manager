@@ -1,6 +1,6 @@
 # Roadmap
 
-## MVP — in progress
+## v0.1.0 — shipped
 
 - [x] OMP 16.x detection and read/write compatibility boundary
 - [x] YAML transaction safety primitives and backups
@@ -15,4 +15,6 @@
 
 - [ ] Budget alerts, menu bar mode, and background helper
 - [ ] Configuration diff UI and retention controls
-- [ ] Signing, notarization, DMG, and Homebrew cask
+- [ ] Signed, notarized app bundle, DMG, and Homebrew cask
+- [ ] Multi-provider gateway profiles and guided OMP rewiring
+- [ ] UI automation and accessibility test coverage
