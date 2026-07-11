@@ -18,12 +18,24 @@ final class YAMLConfigurationStoreTests: XCTestCase {
         """.write(to: models, atomically: true, encoding: .utf8)
         let store = YAMLConfigurationStore()
         let current = try await store.readDocument(at: models)
-        let provider = ProviderConfiguration(id: "managed", displayName: "Managed", type: .openAICompatible, baseURL: try XCTUnwrap(URL(string: "https://api.example.com/v1")), keychainAccount: "provider.managed", models: [ManagedModel(id: "test")])
+        let provider = ProviderConfiguration(
+            id: "managed",
+            displayName: "Managed",
+            type: .openAICompatible,
+            ompAPIOverride: "openai-responses",
+            baseURL: try XCTUnwrap(URL(string: "https://api.example.com/v1")),
+            keychainAccount: "provider.managed",
+            models: [ManagedModel(id: "test", displayName: "Test", contextWindow: 200_000, maxTokens: 32_000, inputPricePerMillion: 3, outputPricePerMillion: 15, cacheReadPricePerMillion: 0.3, cacheWritePricePerMillion: 3.75, inputModalities: ["text", "image"], supportsReasoning: true)]
+        )
         let result = try await store.applyProvider(provider, at: models, expected: current.fingerprint)
         let text = try String(contentsOf: models, encoding: .utf8)
         XCTAssertTrue(text.contains("futureTopLevel"))
         XCTAssertTrue(text.contains("customField"))
         XCTAssertTrue(text.contains("managed"))
+        XCTAssertTrue(text.contains("contextWindow"))
+        XCTAssertTrue(text.contains("cacheRead"))
+        XCTAssertTrue(text.contains("reasoning"))
+        XCTAssertTrue(text.contains("openai-responses"))
         XCTAssertTrue(FileManager.default.fileExists(atPath: result.backupURL.path))
     }
 

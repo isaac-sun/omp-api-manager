@@ -119,7 +119,7 @@ private final class ProviderManagementViewModel: ObservableObject {
         catch { errorMessage = error.localizedDescription }
     }
 
-    func save(id: String, name: String, type: ProviderType, baseURL: String, apiKey: String, modelID: String, apply: Bool) async -> Bool {
+    func save(id: String, name: String, type: ProviderType, ompAPI: String, baseURL: String, apiKey: String, models: [ManagedModel], apply: Bool) async -> Bool {
         guard let service else { return false }
         guard let endpoint = URL(string: baseURL) else {
             errorMessage = "Enter a valid API base URL."
@@ -129,10 +129,11 @@ private final class ProviderManagementViewModel: ObservableObject {
             id: id,
             displayName: name,
             type: type,
+            ompAPIOverride: ompAPI == type.ompAPI ? nil : ompAPI,
             baseURL: endpoint,
             keychainAccount: "provider.\(id)",
-            models: modelID.isEmpty ? [] : [ManagedModel(id: modelID)],
-            defaultModelID: modelID.isEmpty ? nil : modelID
+            models: models,
+            defaultModelID: models.first?.id
         )
         isSaving = true
         defer { isSaving = false }
@@ -143,6 +144,22 @@ private final class ProviderManagementViewModel: ObservableObject {
             return true
         } catch {
             // Applying can fail after the validated provider was safely saved as a draft.
+            await refresh()
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func importNewAPIChannelConnection(_ source: String, apply: Bool) async -> Bool {
+        guard let service else { return false }
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            _ = try await service.importNewAPIChannelConnection(source, apply: apply)
+            await refresh()
+            return true
+        } catch {
+            // Applying can fail after the provider was safely imported as a draft.
             await refresh()
             errorMessage = error.localizedDescription
             return false
@@ -420,6 +437,8 @@ private struct ProvidersView: View {
     @ObservedObject var viewModel: ProviderManagementViewModel
     @ObservedObject var gatewayViewModel: GatewayViewModel
     @State private var isPresentingEditor = false
+    @State private var isPresentingNewAPIImporter = false
+    @State private var providerToDuplicate: ProviderConfiguration?
 
     var body: some View {
         ScrollView {
@@ -444,6 +463,8 @@ private struct ProvidersView: View {
                         ForEach(viewModel.providers) { provider in
                             ProviderCard(provider: provider, gatewayViewModel: gatewayViewModel) {
                                 Task { await viewModel.delete(provider) }
+                            } duplicate: {
+                                providerToDuplicate = provider
                             }
                         }
                     }
@@ -452,9 +473,17 @@ private struct ProvidersView: View {
             .padding(28)
         }
         .navigationTitle("Providers")
-        .toolbar { Button("Add Provider", systemImage: "plus") { isPresentingEditor = true }.keyboardShortcut("n", modifiers: [.command]) }
+        .toolbar {
+            ToolbarItemGroup {
+                Button("Import New API Connection", systemImage: "arrow.down.doc") { isPresentingNewAPIImporter = true }
+                Button("Add Provider", systemImage: "plus") { isPresentingEditor = true }
+                    .keyboardShortcut("n", modifiers: [.command])
+            }
+        }
         .task { await viewModel.refresh() }
         .sheet(isPresented: $isPresentingEditor) { ProviderEditor(viewModel: viewModel) }
+        .sheet(item: $providerToDuplicate) { ProviderEditor(viewModel: viewModel, template: $0) }
+        .sheet(isPresented: $isPresentingNewAPIImporter) { NewAPIChannelConnectionImporterView(viewModel: viewModel) }
         .alert("Provider Error", isPresented: Binding(get: { viewModel.errorMessage != nil }, set: { if !$0 { viewModel.dismissError() } })) {
             Button("OK", role: .cancel) { viewModel.dismissError() }
         } message: { Text(viewModel.errorMessage ?? "") }
@@ -470,9 +499,22 @@ private struct ProviderEditor: View {
     @State private var id = ""
     @State private var name = ""
     @State private var type: ProviderType = .openAICompatible
+    @State private var ompAPI = ProviderType.openAICompatible.ompAPI
     @State private var baseURL = "https://"
     @State private var apiKey = ""
-    @State private var modelID = ""
+    @State private var isAPIKeyVisible = false
+    @State private var modelDrafts: [ModelDraft] = [ModelDraft()]
+    @State private var validationMessage: String?
+
+    init(viewModel: ProviderManagementViewModel, template: ProviderConfiguration? = nil) {
+        self.viewModel = viewModel
+        _id = State(initialValue: template.map { "\($0.id)-copy-\(UUID().uuidString.prefix(4).lowercased())" } ?? "")
+        _name = State(initialValue: template.map { "\($0.displayName) Copy" } ?? "")
+        _type = State(initialValue: template?.type ?? .openAICompatible)
+        _ompAPI = State(initialValue: template?.ompAPI ?? ProviderType.openAICompatible.ompAPI)
+        _baseURL = State(initialValue: template?.baseURL.absoluteString ?? "https://")
+        _modelDrafts = State(initialValue: template.map { $0.models.map(ModelDraft.init) } ?? [ModelDraft()])
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -490,14 +532,31 @@ private struct ProviderEditor: View {
                             Text(protocolLabel(option)).tag(option)
                         }
                     }
+                    Picker("OMP API mode", selection: $ompAPI) {
+                        ForEach(ompAPIOptions(for: type), id: \.self) { option in Text(option).tag(option) }
+                    }
+                    .onChange(of: type) { _, newValue in
+                        if !ompAPIOptions(for: newValue).contains(ompAPI) { ompAPI = newValue.ompAPI }
+                    }
                 }
 
                 Section("Connection") {
                     TextField("API Base URL", text: $baseURL, prompt: Text("https://api.example.com/v1"))
-                    SecureField("API Key", text: $apiKey)
+                    LabeledContent("API Key") {
+                        HStack(spacing: 8) {
+                            Group {
+                                if isAPIKeyVisible { TextField("Enter API key", text: $apiKey) }
+                                else { SecureField("Enter API key", text: $apiKey) }
+                            }
+                            Button { isAPIKeyVisible.toggle() } label: {
+                                Image(systemName: isAPIKeyVisible ? "eye.slash" : "eye")
+                            }
+                            .accessibilityLabel(isAPIKeyVisible ? "Hide API key" : "Show API key")
+                        }
+                    }
                     HStack {
                         Button("Fetch Models") { Task { await viewModel.fetchModels(type: type, baseURL: baseURL, apiKey: apiKey) } }
-                        Button("Test Connection") { Task { await viewModel.testConnection(type: type, baseURL: baseURL, apiKey: apiKey, modelID: modelID) } }
+                        Button("Test Connection") { Task { await viewModel.testConnection(type: type, baseURL: baseURL, apiKey: apiKey, modelID: modelDrafts.first?.modelID ?? "") } }
                     }
                     .disabled(viewModel.isConnecting)
                     if viewModel.isConnecting { ProgressView().controlSize(.small) }
@@ -507,16 +566,18 @@ private struct ProviderEditor: View {
                     }
                 }
 
-                Section("Default model") {
-                    if !viewModel.fetchedModels.isEmpty {
-                        Picker("Fetched Model", selection: $modelID) {
-                            Text("Select a model").tag("")
-                            ForEach(viewModel.fetchedModels) { model in
-                                Text(model.displayName ?? model.id).tag(model.id)
-                            }
-                        }
+                Section("Models") {
+                    Text("Define one or more models, including capabilities and per-million-token pricing.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    ForEach($modelDrafts) { $draft in
+                        ModelDraftFields(
+                            draft: $draft,
+                            fetchedModels: viewModel.fetchedModels,
+                            canRemove: modelDrafts.count > 1,
+                            remove: { modelDrafts.removeAll { $0.id == draft.id } }
+                        )
                     }
-                    TextField("Model ID", text: $modelID, prompt: Text("Enter manually if needed"))
+                    Button("Add Another Model", systemImage: "plus") { modelDrafts.append(ModelDraft()) }
                 }
             }
             .formStyle(.grouped)
@@ -533,12 +594,23 @@ private struct ProviderEditor: View {
             }
         }
         .padding(28)
-        .frame(width: 590)
+        .frame(width: 650)
+        .onDisappear { apiKey = "" }
+        .alert("Model Configuration", isPresented: Binding(get: { validationMessage != nil }, set: { if !$0 { validationMessage = nil } })) {
+            Button("OK", role: .cancel) { validationMessage = nil }
+        } message: { Text(validationMessage ?? "") }
     }
 
     private func save(apply: Bool) {
+        let models: [ManagedModel]
+        do {
+            models = try modelDrafts.filter(\.hasContent).map { try $0.makeModel() }
+        } catch {
+            validationMessage = error.localizedDescription
+            return
+        }
         Task {
-            if await viewModel.save(id: id, name: name, type: type, baseURL: baseURL, apiKey: apiKey, modelID: modelID, apply: apply) {
+            if await viewModel.save(id: id, name: name, type: type, ompAPI: ompAPI, baseURL: baseURL, apiKey: apiKey, models: models, apply: apply) {
                 apiKey = ""
                 dismiss()
             }
@@ -551,6 +623,206 @@ private struct ProviderEditor: View {
         case .anthropicCompatible: "Anthropic Compatible"
         case .customOpenAILike: "Custom OpenAI-like"
         case .customAnthropicLike: "Custom Anthropic-like"
+        }
+    }
+
+    private func ompAPIOptions(for type: ProviderType) -> [String] {
+        switch type {
+        case .openAICompatible, .customOpenAILike:
+            ["openai-completions", "openai-responses", "openai-codex-responses", "azure-openai-responses"]
+        case .anthropicCompatible, .customAnthropicLike:
+            ["anthropic-messages"]
+        }
+    }
+}
+
+private struct ModelDraft: Identifiable {
+    let id = UUID()
+    var modelID = ""
+    var displayName = ""
+    var contextWindow = ""
+    var maxTokens = ""
+    var inputPrice = ""
+    var outputPrice = ""
+    var cacheReadPrice = ""
+    var cacheWritePrice = ""
+    var acceptsText = true
+    var acceptsImage = false
+    var supportsReasoning = false
+
+    init(model: ManagedModel? = nil) {
+        guard let model else { return }
+        modelID = model.id
+        displayName = model.displayName == model.id ? "" : model.displayName
+        contextWindow = model.contextWindow.map(String.init) ?? ""
+        maxTokens = model.maxTokens.map(String.init) ?? ""
+        inputPrice = model.inputPricePerMillion.map(decimalText) ?? ""
+        outputPrice = model.outputPricePerMillion.map(decimalText) ?? ""
+        cacheReadPrice = model.cacheReadPricePerMillion.map(decimalText) ?? ""
+        cacheWritePrice = model.cacheWritePricePerMillion.map(decimalText) ?? ""
+        acceptsText = model.inputModalities?.contains("text") ?? true
+        acceptsImage = model.inputModalities?.contains("image") ?? false
+        supportsReasoning = model.supportsReasoning ?? false
+    }
+
+    var hasContent: Bool {
+        [modelID, displayName, contextWindow, maxTokens, inputPrice, outputPrice, cacheReadPrice, cacheWritePrice].contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+
+    func makeModel() throws -> ManagedModel {
+        let identifier = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !identifier.isEmpty else { throw AppError.invalidProvider("Each configured model needs an ID.") }
+        let context = try positiveInteger(contextWindow, label: "Context window")
+        let maximum = try positiveInteger(maxTokens, label: "Max tokens")
+        let input = try nonNegativeDecimal(inputPrice, label: "Input price")
+        let output = try nonNegativeDecimal(outputPrice, label: "Output price")
+        let cacheRead = try nonNegativeDecimal(cacheReadPrice, label: "Cache read price")
+        let cacheWrite = try nonNegativeDecimal(cacheWritePrice, label: "Cache write price")
+        var modalities: [String] = []
+        if acceptsText { modalities.append("text") }
+        if acceptsImage { modalities.append("image") }
+        return ManagedModel(
+            id: identifier,
+            displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : displayName.trimmingCharacters(in: .whitespacesAndNewlines),
+            contextWindow: context,
+            maxTokens: maximum,
+            inputPricePerMillion: input,
+            outputPricePerMillion: output,
+            cacheReadPricePerMillion: cacheRead,
+            cacheWritePricePerMillion: cacheWrite,
+            inputModalities: modalities.isEmpty ? nil : modalities,
+            supportsReasoning: supportsReasoning ? true : nil
+        )
+    }
+
+    private func positiveInteger(_ value: String, label: String) throws -> Int? {
+        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        guard let number = Int(text), number > 0 else { throw AppError.invalidProvider("\(label) must be a positive whole number.") }
+        return number
+    }
+
+    private func nonNegativeDecimal(_ value: String, label: String) throws -> Decimal? {
+        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        let number = Decimal(string: text) ?? Double(text).map { Decimal($0) }
+        guard let number, number >= 0 else { throw AppError.invalidProvider("\(label) must be a non-negative number.") }
+        return number
+    }
+
+    private func decimalText(_ value: Decimal) -> String { NSDecimalNumber(decimal: value).stringValue }
+}
+
+private struct ModelDraftFields: View {
+    @Binding var draft: ModelDraft
+    let fetchedModels: [RemoteModel]
+    let canRemove: Bool
+    let remove: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(draft.modelID.isEmpty ? "New model" : draft.modelID).font(.subheadline.weight(.semibold))
+                Spacer()
+                if canRemove {
+                    Button(role: .destructive, action: remove) { Image(systemName: "minus.circle") }
+                        .accessibilityLabel("Remove model")
+                }
+            }
+            if !fetchedModels.isEmpty {
+                Picker("Discovered model", selection: $draft.modelID) {
+                    Text("Select a model").tag("")
+                    ForEach(fetchedModels) { model in Text(model.displayName ?? model.id).tag(model.id) }
+                }
+            }
+            TextField("Model ID", text: $draft.modelID, prompt: Text("gpt-4.1"))
+            TextField("Display name", text: $draft.displayName, prompt: Text("Optional"))
+            Grid(horizontalSpacing: 12, verticalSpacing: 8) {
+                GridRow {
+                    TextField("Context window", text: $draft.contextWindow)
+                    TextField("Max tokens", text: $draft.maxTokens)
+                }
+                GridRow {
+                    TextField("Input / 1M", text: $draft.inputPrice)
+                    TextField("Output / 1M", text: $draft.outputPrice)
+                }
+                GridRow {
+                    TextField("Cache read / 1M", text: $draft.cacheReadPrice)
+                    TextField("Cache write / 1M", text: $draft.cacheWritePrice)
+                }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Quick token presets").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text("Context").font(.caption).foregroundStyle(.secondary)
+                    ForEach([32_000, 64_000, 128_000, 200_000, 500_000], id: \.self) { value in
+                        Button(tokenLabel(value)) { draft.contextWindow = String(value) }.buttonStyle(.bordered)
+                    }
+                }
+                HStack(spacing: 6) {
+                    Text("Output").font(.caption).foregroundStyle(.secondary)
+                    ForEach([8_000, 16_000, 32_000, 64_000, 128_000], id: \.self) { value in
+                        Button(tokenLabel(value)) { draft.maxTokens = String(value) }.buttonStyle(.bordered)
+                    }
+                }
+            }
+            .controlSize(.small)
+            Text("Advanced capabilities").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+            HStack(spacing: 16) {
+                Toggle("Text", isOn: $draft.acceptsText)
+                Toggle("Image", isOn: $draft.acceptsImage)
+                Toggle("Reasoning", isOn: $draft.supportsReasoning)
+            }
+            .toggleStyle(.checkbox)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func tokenLabel(_ value: Int) -> String { "\(value / 1_000)K" }
+}
+
+private struct NewAPIChannelConnectionImporterView: View {
+    @ObservedObject var viewModel: ProviderManagementViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var source = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            PageHeader(
+                title: "Import New API connection",
+                subtitle: "Paste a newapi_channel_conn JSON connection to create an OpenAI-compatible provider.",
+                icon: "arrow.down.doc.fill"
+            )
+            TextEditor(text: $source)
+                .font(.system(.body, design: .monospaced))
+                .frame(minHeight: 210)
+                .padding(8)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            Label("The connection is parsed only in memory. Its API key is stored in macOS Keychain; the pasted JSON is never saved.", systemImage: "lock.fill")
+                .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Button("Cancel") { dismiss() }
+                Spacer()
+                Button("Import Draft") { `import`(apply: false) }
+                    .disabled(source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isSaving)
+                Button("Import and Apply") { `import`(apply: true) }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isSaving)
+            }
+        }
+        .padding(28)
+        .frame(width: 680)
+        .onDisappear { source = "" }
+    }
+
+    private func `import`(apply: Bool) {
+        Task {
+            if await viewModel.importNewAPIChannelConnection(source, apply: apply) {
+                source = ""
+                dismiss()
+            }
         }
     }
 }
@@ -897,6 +1169,7 @@ private struct ProviderCard: View {
     let provider: ProviderConfiguration
     @ObservedObject var gatewayViewModel: GatewayViewModel
     let delete: () -> Void
+    let duplicate: () -> Void
 
     var body: some View {
         AppCard {
@@ -915,7 +1188,7 @@ private struct ProviderCard: View {
             }
             Divider()
             DetailLine(label: "Endpoint", value: provider.baseURL.absoluteString)
-            DetailLine(label: "Protocol", value: protocolLabel(provider.type))
+            DetailLine(label: "Protocol", value: "\(protocolLabel(provider.type)) · \(provider.ompAPI)")
             HStack {
                 if gatewayViewModel.status == nil {
                     Button("Start gateway") { Task { await gatewayViewModel.start(for: provider) } }
@@ -925,6 +1198,8 @@ private struct ProviderCard: View {
                         .buttonStyle(.bordered)
                 }
                 Spacer()
+                Button("Duplicate", action: duplicate)
+                    .buttonStyle(.bordered)
                 Button(role: .destructive, action: delete) {
                     Image(systemName: "trash")
                 }

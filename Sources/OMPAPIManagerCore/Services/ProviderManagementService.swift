@@ -42,6 +42,19 @@ public struct ProviderManagementService: Sendable {
         return try await configAdapter.applyProvider(provider, to: installation)
     }
 
+    /// Imports a New API channel connection without retaining its source JSON or API key in provider metadata.
+    @discardableResult
+    public func importNewAPIChannelConnection(_ source: String, apply: Bool) async throws -> ProviderConfiguration {
+        let existingProviderIDs = Set(try await repository.fetchAll().map(\.id))
+        let imported = try NewAPIChannelConnectionImporter().decode(source, existingProviderIDs: existingProviderIDs)
+        if apply {
+            _ = try await saveAndApply(imported.provider, apiKey: imported.apiKey)
+        } else {
+            try await saveDraft(imported.provider, apiKey: imported.apiKey)
+        }
+        return imported.provider
+    }
+
     private func validate(_ provider: ProviderConfiguration) throws {
         let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-_")
         guard !provider.id.isEmpty,
@@ -53,6 +66,21 @@ public struct ProviderManagementService: Sendable {
         }
         guard provider.timeoutSeconds >= 1, provider.timeoutSeconds <= 600 else {
             throw AppError.invalidProvider("Timeout must be between 1 and 600 seconds.")
+        }
+        for model in provider.models {
+            guard !model.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw AppError.invalidProvider("Each configured model needs an ID.")
+            }
+            if let contextWindow = model.contextWindow, contextWindow <= 0 {
+                throw AppError.invalidProvider("Model context window must be positive.")
+            }
+            if let maxTokens = model.maxTokens, maxTokens <= 0 {
+                throw AppError.invalidProvider("Model max tokens must be positive.")
+            }
+            let prices = [model.inputPricePerMillion, model.outputPricePerMillion, model.cacheReadPricePerMillion, model.cacheWritePricePerMillion]
+            guard prices.allSatisfy({ $0.map { $0 >= 0 } ?? true }) else {
+                throw AppError.invalidProvider("Model prices cannot be negative.")
+            }
         }
         try validateEndpoint(provider.baseURL)
     }

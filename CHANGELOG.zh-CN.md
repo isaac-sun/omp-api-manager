@@ -6,6 +6,10 @@
 
 ## 未发布
 
+### 新增
+
+- 安全导入 `newapi_channel_conn` JSON 连接：规范化 OpenAI `/v1` 基础 URL，API Key 仅保存到 Keychain。
+
 ## [0.1.0] - 2026-07-11
 
 ### 新增
