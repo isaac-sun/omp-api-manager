@@ -10,7 +10,7 @@ let package = Package(
     ],
     dependencies: [
         // Pin the exact parser version so production configuration handling is reproducible.
-        .package(url: "https://github.com/jpsim/Yams.git", exact: "6.1.0"),
+        .package(url: "https://github.com/jpsim/Yams.git", exact: "6.2.2"),
         .package(url: "https://github.com/apple/swift-nio.git", exact: "2.99.0")
     ],
     targets: [
