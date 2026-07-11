@@ -38,6 +38,7 @@
 | --- | --- |
 | 安全 OMP 配置 | 检测 OMP 16.x，语义化编辑 YAML，创建备份、检查冲突并原子写入。未知版本仅可读。 |
 | 服务商管理 | 支持 OpenAI 兼容和 Anthropic 兼容端点、模型发现、连接测试、草稿和安全应用。 |
+| New API 导入 | 将 `newapi_channel_conn` JSON 导入为 OpenAI 兼容服务商；密钥只保存到 Keychain，原始 JSON 不会持久化。 |
 | 凭据保护 | 服务商密钥保存在 macOS Keychain；服务商元数据和高级编辑器均不会显示 API Key。 |
 | 本地网关 | 在 `127.0.0.1` 启动独立本地令牌的网关，从 Keychain 替换上游凭据，并转发普通响应与 SSE。 |
 | 私密用量面板 | 在 SQLite 保存脱敏请求元数据，并支持 CSV/JSON 导出；不会持久化提示词、响应、API Key 或授权头。 |

@@ -6,6 +6,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Added
+
+- Safe import for `newapi_channel_conn` JSON connections, including OpenAI `/v1` base URL normalization and Keychain-only API key storage.
+
 ## [0.1.0] - 2026-07-11
 
 ### Added

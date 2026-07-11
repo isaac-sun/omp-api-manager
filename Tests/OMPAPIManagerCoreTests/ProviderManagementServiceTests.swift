@@ -85,4 +85,33 @@ final class ProviderManagementServiceTests: XCTestCase {
         let drafts = try await service.listProviders()
         XCTAssertEqual(drafts, [provider])
     }
+
+    func testImportNewAPIConnectionStoresOnlyKeychainSecretAndNormalizesV1URL() async throws {
+        let repository = InMemoryProviderRepository()
+        let keychain = KeychainSpy()
+        let service = ProviderManagementService(repository: repository, keychain: keychain)
+        let source = #"{"_type":"newapi_channel_conn","key":"test-newapi-key","url":"https://api.example.test"}"#
+
+        let provider = try await service.importNewAPIChannelConnection(source, apply: false)
+
+        XCTAssertEqual(provider.id, "newapi-api-example-test")
+        XCTAssertEqual(provider.type, .customOpenAILike)
+        XCTAssertEqual(provider.baseURL, try XCTUnwrap(URL(string: "https://api.example.test/v1")))
+        XCTAssertEqual(keychain.saved[provider.keychainAccount], "test-newapi-key")
+        let stored = try await service.listProviders()
+        XCTAssertEqual(stored, [provider])
+        XCTAssertFalse(String(describing: stored).contains("test-newapi-key"))
+    }
+
+    func testImportNewAPIConnectionRejectsUnexpectedConnectionType() async throws {
+        let service = ProviderManagementService(repository: InMemoryProviderRepository(), keychain: KeychainSpy())
+        let source = #"{"_type":"other_connection","key":"test-key","url":"https://api.example.test/v1"}"#
+
+        do {
+            _ = try await service.importNewAPIChannelConnection(source, apply: false)
+            XCTFail("Expected unsupported connection type rejection")
+        } catch let error as AppError {
+            XCTAssertEqual(error, .invalidProvider("Unsupported connection type. Expected newapi_channel_conn."))
+        }
+    }
 }

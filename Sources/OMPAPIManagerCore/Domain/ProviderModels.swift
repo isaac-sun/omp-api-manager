@@ -30,6 +30,7 @@ public struct ProviderConfiguration: Codable, Sendable, Equatable, Identifiable 
     public let id: String
     public var displayName: String
     public var type: ProviderType
+    public var ompAPIOverride: String?
     public var baseURL: URL
     public var keychainAccount: String
     public var models: [ManagedModel]
@@ -42,10 +43,11 @@ public struct ProviderConfiguration: Codable, Sendable, Equatable, Identifiable 
     public var createdAt: Date
     public var updatedAt: Date
 
-    public init(id: String, displayName: String, type: ProviderType, baseURL: URL, keychainAccount: String, models: [ManagedModel] = [], defaultModelID: String? = nil, headers: [String: String] = [:], timeoutSeconds: Int = 60, isEnabled: Bool = true, tags: [String] = [], notes: String = "", createdAt: Date = .now, updatedAt: Date = .now) {
+    public init(id: String, displayName: String, type: ProviderType, ompAPIOverride: String? = nil, baseURL: URL, keychainAccount: String, models: [ManagedModel] = [], defaultModelID: String? = nil, headers: [String: String] = [:], timeoutSeconds: Int = 60, isEnabled: Bool = true, tags: [String] = [], notes: String = "", createdAt: Date = .now, updatedAt: Date = .now) {
         self.id = id
         self.displayName = displayName
         self.type = type
+        self.ompAPIOverride = ompAPIOverride
         self.baseURL = baseURL
         self.keychainAccount = keychainAccount
         self.models = models
@@ -58,6 +60,8 @@ public struct ProviderConfiguration: Codable, Sendable, Equatable, Identifiable 
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
+
+    public var ompAPI: String { ompAPIOverride ?? type.ompAPI }
 }
 
 public struct ManagedModel: Codable, Sendable, Equatable, Identifiable {
@@ -67,14 +71,22 @@ public struct ManagedModel: Codable, Sendable, Equatable, Identifiable {
     public var maxTokens: Int?
     public var inputPricePerMillion: Decimal?
     public var outputPricePerMillion: Decimal?
+    public var cacheReadPricePerMillion: Decimal?
+    public var cacheWritePricePerMillion: Decimal?
+    public var inputModalities: [String]?
+    public var supportsReasoning: Bool?
 
-    public init(id: String, displayName: String? = nil, contextWindow: Int? = nil, maxTokens: Int? = nil, inputPricePerMillion: Decimal? = nil, outputPricePerMillion: Decimal? = nil) {
+    public init(id: String, displayName: String? = nil, contextWindow: Int? = nil, maxTokens: Int? = nil, inputPricePerMillion: Decimal? = nil, outputPricePerMillion: Decimal? = nil, cacheReadPricePerMillion: Decimal? = nil, cacheWritePricePerMillion: Decimal? = nil, inputModalities: [String]? = nil, supportsReasoning: Bool? = nil) {
         self.id = id
         self.displayName = displayName ?? id
         self.contextWindow = contextWindow
         self.maxTokens = maxTokens
         self.inputPricePerMillion = inputPricePerMillion
         self.outputPricePerMillion = outputPricePerMillion
+        self.cacheReadPricePerMillion = cacheReadPricePerMillion
+        self.cacheWritePricePerMillion = cacheWritePricePerMillion
+        self.inputModalities = inputModalities
+        self.supportsReasoning = supportsReasoning
     }
 }
 

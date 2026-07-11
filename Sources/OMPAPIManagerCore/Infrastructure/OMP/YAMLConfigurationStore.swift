@@ -97,17 +97,29 @@ public actor YAMLConfigurationStore {
         if case .object(let existing) = providers[provider.id] { providerObject = existing } else { providerObject = [:] }
         providerObject["baseUrl"] = .string(provider.baseURL.absoluteString)
         providerObject["apiKey"] = .string("!security find-generic-password -s com.omp-api-manager -a \(provider.keychainAccount) -w")
-        providerObject["api"] = .string(provider.type.ompAPI)
+        providerObject["api"] = .string(provider.ompAPI)
         if !provider.headers.isEmpty { providerObject["headers"] = .object(provider.headers.mapValues(YAMLValue.string)) }
         providerObject["models"] = .array(provider.models.map { model in
             var modelObject: [String: YAMLValue] = ["id": .string(model.id), "name": .string(model.displayName)]
             if let value = model.contextWindow { modelObject["contextWindow"] = .integer(value) }
             if let value = model.maxTokens { modelObject["maxTokens"] = .integer(value) }
+            if let values = model.inputModalities, !values.isEmpty { modelObject["input"] = .array(values.map(YAMLValue.string)) }
+            if let value = model.supportsReasoning { modelObject["reasoning"] = .bool(value) }
+            var cost: [String: YAMLValue] = [:]
+            if let value = model.inputPricePerMillion { cost["input"] = .decimal(decimalDouble(value)) }
+            if let value = model.outputPricePerMillion { cost["output"] = .decimal(decimalDouble(value)) }
+            if let value = model.cacheReadPricePerMillion { cost["cacheRead"] = .decimal(decimalDouble(value)) }
+            if let value = model.cacheWritePricePerMillion { cost["cacheWrite"] = .decimal(decimalDouble(value)) }
+            if !cost.isEmpty { modelObject["cost"] = .object(cost) }
             return .object(modelObject)
         })
         providers[provider.id] = .object(providerObject)
         root["providers"] = .object(providers)
         return YAMLDocument(root: .object(root))
+    }
+
+    private func decimalDouble(_ value: Decimal) -> Double {
+        NSDecimalNumber(decimal: value).doubleValue
     }
 
     private func makeBackup(of url: URL) throws -> URL {

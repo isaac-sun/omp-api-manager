@@ -38,6 +38,7 @@ Custom AI providers are useful, but manually editing OMP configuration can risk 
 | --- | --- |
 | Safe OMP configuration | Detects OMP 16.x, semantically edits YAML, creates backups, checks for conflicts, and writes atomically. Unknown versions are read-only. |
 | Provider management | Supports OpenAI-compatible and Anthropic-compatible endpoints, model discovery, connection testing, drafts, and secure apply. |
+| New API import | Imports `newapi_channel_conn` JSON into an OpenAI-compatible provider, stores its key only in Keychain, and never persists the source JSON. |
 | Credential protection | Stores provider keys in the macOS Keychain; no API key is saved in provider metadata or displayed by the advanced editor. |
 | Local gateway | Starts a `127.0.0.1`-only gateway with a separate local token, substitutes upstream Keychain credentials, and forwards standard and SSE responses. |
 | Private usage dashboard | Stores sanitized request metadata in SQLite and exports CSV or JSON. Prompts, responses, API keys, and authorization headers are never persisted. |
