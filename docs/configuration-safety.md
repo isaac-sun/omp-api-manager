@@ -1,6 +1,8 @@
 # Configuration safety
 
-Every future configuration write follows this transaction:
+> Language: **English** | [简体中文](zh-CN/configuration-safety.md)
+
+Every supported configuration write follows this transaction:
 
 1. Read the target file and calculate a fingerprint (SHA-256, byte count, modification time).
 2. Parse YAML into a semantic value tree.

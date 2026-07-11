@@ -1,5 +1,7 @@
 # Changelog
 
+> Language: **English** | [简体中文](CHANGELOG.zh-CN.md)
+
 All notable changes to this project will be documented here.
 
 ## Unreleased

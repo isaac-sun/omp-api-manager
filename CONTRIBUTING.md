@@ -1,5 +1,7 @@
 # Contributing to OMP API Manager
 
+> Language: **English** | [简体中文](CONTRIBUTING.zh-CN.md)
+
 Thanks for helping make OMP API Manager safer and more useful. Contributions of code, documentation, tests, design feedback, and reproducible bug reports are welcome.
 
 ## Before you start
