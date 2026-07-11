@@ -26,7 +26,7 @@
   <a href="https://github.com/isaac-sun/omp-api-manager/releases"><img src="https://img.shields.io/github/v/release/isaac-sun/omp-api-manager?display_name=tag" alt="最新版本"></a>
 </p>
 
-> **v0.1.0** 是第一个开发者版本。可从 [Releases](https://github.com/isaac-sun/omp-api-manager/releases) 下载 Apple Silicon DMG，或在 Xcode 中打开 `Package.swift`。DMG 使用 ad-hoc 签名，尚未经过 Developer ID 公证；打开前请阅读发布说明。
+> **v0.2.0** 新增安全的 `newapi_channel_conn` 导入、详细的多模型配置、可选择的 OMP API 模式，以及不会复制凭据的服务商复制功能。可从 [Releases](https://github.com/isaac-sun/omp-api-manager/releases) 下载 Apple Silicon DMG，或阅读 [v0.2.0 发布说明](docs/zh-CN/releases/v0.2.0.md)。DMG 使用 ad-hoc 签名，尚未经过 Developer ID 公证。
 
 ## 为什么使用 OMP API Manager？
 
