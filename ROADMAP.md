@@ -13,10 +13,26 @@
 - [x] SQLite usage store, dashboard, and CSV/JSON export
 - [x] UI and gateway integration tests
 
+## v0.2.0 — shipped
+
+- [x] Secure `newapi_channel_conn` import
+- [x] Detailed multi-model provider configuration
+- [x] Selectable OMP API modes
+- [x] Credential-safe provider duplication
+- [x] Bilingual documentation and downloadable DMG release
+
+## v0.3.0 — shipped
+
+- [x] Primary feature: user-initiated checks for the latest stable GitHub Release
+- [x] Standard macOS **Check for Updates…** menu command and Software Update settings
+- [x] Strict semantic-version comparison, response validation, ETag reuse, and rate-limit handling
+- [x] Manual handoff to the official GitHub Release page without automatic download or installation
+
 ## Later
 
+- [ ] Developer ID signing, notarization, and independently signed automatic updates
 - [ ] Budget alerts, menu bar mode, and background helper
 - [ ] Configuration diff UI and retention controls
-- [ ] Developer ID signing, notarization, universal DMG, and Homebrew cask
+- [ ] Universal DMG and Homebrew cask
 - [ ] Multi-provider gateway profiles and guided OMP rewiring
 - [ ] UI automation and accessibility test coverage

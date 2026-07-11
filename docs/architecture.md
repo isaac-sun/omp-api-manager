@@ -12,7 +12,9 @@ flowchart TB
   Core --> Vault["Keychain service"]
   Core --> Gateway["Loopback gateway"]
   Core --> Store["SQLite usage repository"]
+  Core --> Updates["GitHub release checker"]
   OMP --> Files["config.yml / models.yml"]
+  Updates --> GitHub["api.github.com"]
 ```
 
 ## Modules
@@ -22,7 +24,7 @@ flowchart TB
 - `Infrastructure/OMP`: installation discovery, semantic YAML tree, atomic transaction store, and version-specific adapter.
 - `Infrastructure/Providers`: protocol-specific endpoint validation and transport.
 - `Infrastructure/Keychain`: macOS Keychain wrapper. API key values never enter persistence models.
-- `Services`: pure business calculations such as cost estimation.
+- `Services`: business use cases such as cost estimation and the manually triggered software-update check.
 
 ## Security boundaries
 
@@ -40,8 +42,12 @@ The SQLite usage repository is owned by infrastructure, never views. It stores s
 
 The loopback listener authenticates a request with a distinct local token, looks up the upstream credential in Keychain, forwards it to the selected provider, then stores redacted metrics. Standard responses and SSE byte chunks pass through without persistence. Final usage is extracted only when the provider supplies it.
 
+## Software update boundary
+
+Update checks are user initiated and query only the fixed public GitHub Releases endpoint. The core validates a stable semantic-version tag, constructs the official release URL locally, and returns presentation state to the app. It sends no GitHub token or local application data. Because current builds are ad-hoc signed and unnotarized, the app opens the official release page and never downloads or installs an update automatically.
+
 ## MVP implementation status
 
-Implemented: installation discovery, documented directory resolution, read-only configuration inspection UI, semantic YAML read/update transaction, conflict detection, backups, OMP 16 adapter, Keychain wrapper, validated Keychain-backed provider drafts, OpenAI/Anthropic model discovery and connection testing, loopback SSE gateway, sanitized SQLite usage persistence, usage dashboard/export, and unit/integration tests.
+Implemented: installation discovery, documented directory resolution, read-only configuration inspection UI, semantic YAML read/update transaction, conflict detection, backups, OMP 16 adapter, Keychain wrapper, validated Keychain-backed provider drafts, OpenAI/Anthropic model discovery and connection testing, loopback SSE gateway, sanitized SQLite usage persistence, usage dashboard/export, manual GitHub release checks, and unit/integration tests.
 
 Planned: configuration diff and retention controls, multi-provider gateway profiles, UI automation, signing/notarization, and packaged distribution.
