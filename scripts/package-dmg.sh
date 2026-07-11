@@ -33,8 +33,16 @@ work_dir="$(mktemp -d "${TMPDIR:-/private/tmp}/omp-api-manager.XXXXXX")"
 app_dir="$work_dir/$bundle_name"
 staging_dir="$work_dir/dmg-staging"
 iconset_dir="$work_dir/AppIcon.iconset"
+smoke_pid=""
 
-trap 'rm -rf "$work_dir"' EXIT
+cleanup() {
+  if [[ -n "$smoke_pid" ]] && kill -0 "$smoke_pid" >/dev/null 2>&1; then
+    kill "$smoke_pid" >/dev/null 2>&1 || true
+    wait "$smoke_pid" >/dev/null 2>&1 || true
+  fi
+  rm -rf "$work_dir"
+}
+trap cleanup EXIT
 
 if [[ "$architecture" != "arm64" && "$architecture" != "x86_64" ]]; then
   echo "Unsupported macOS architecture: $architecture" >&2
@@ -63,6 +71,7 @@ install -m 755 "$bin_dir/OMPAPIManager" "$app_dir/Contents/MacOS/OMPAPIManager"
 ditto "$resource_bundle" "$app_dir/Contents/Resources/$(basename "$resource_bundle")"
 
 source_icon="Sources/OMPAPIManagerApp/Resources/AppIcon-master.png"
+install -m 644 "$source_icon" "$app_dir/Contents/Resources/AppIcon-master.png"
 for size in 16 32 128 256 512; do
   sips -z "$size" "$size" "$source_icon" --out "$iconset_dir/icon_${size}x${size}.png" >/dev/null
 done
@@ -115,6 +124,23 @@ plutil -lint "$app_dir/Contents/Info.plist"
 xattr -cr "$app_dir"
 codesign --force --deep --sign - --timestamp=none "$app_dir"
 codesign --verify --deep --strict "$app_dir"
+
+smoke_home="$work_dir/smoke-home"
+smoke_log="$work_dir/smoke.log"
+mkdir -p "$smoke_home"
+HOME="$smoke_home" "$app_dir/Contents/MacOS/OMPAPIManager" >"$smoke_log" 2>&1 &
+smoke_pid=$!
+sleep 2
+if ! kill -0 "$smoke_pid" >/dev/null 2>&1; then
+  status=0
+  wait "$smoke_pid" || status=$?
+  echo "Packaged app exited during launch smoke test (status $status)." >&2
+  cat "$smoke_log" >&2
+  exit 1
+fi
+kill "$smoke_pid"
+wait "$smoke_pid" >/dev/null 2>&1 || true
+smoke_pid=""
 
 mkdir -p "$staging_dir"
 ditto "$app_dir" "$staging_dir/$bundle_name"

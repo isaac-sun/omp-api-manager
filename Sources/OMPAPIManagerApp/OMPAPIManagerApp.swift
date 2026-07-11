@@ -32,7 +32,13 @@ struct OMPAPIManagerApp: App {
 
 private final class OMPApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        if let iconURL = Bundle.module.url(forResource: "AppIcon-master", withExtension: "png"),
+        let iconURL: URL?
+        if Bundle.main.bundleURL.pathExtension == "app" {
+            iconURL = Bundle.main.url(forResource: "AppIcon-master", withExtension: "png")
+        } else {
+            iconURL = Bundle.module.url(forResource: "AppIcon-master", withExtension: "png")
+        }
+        if let iconURL,
            let icon = NSImage(contentsOf: iconURL) {
             NSApp.applicationIconImage = icon
         }
@@ -554,19 +560,42 @@ private struct ProviderEditor: View {
                 }
 
                 Section("Connection") {
-                    TextField("API Base URL", text: $baseURL, prompt: Text("https://api.example.com/v1"))
-                    LabeledContent("API Key") {
-                        HStack(spacing: 8) {
-                            Group {
-                                if isAPIKeyVisible { TextField("Enter API key", text: $apiKey) }
-                                else { SecureField("Enter API key", text: $apiKey) }
-                            }
-                            Button { isAPIKeyVisible.toggle() } label: {
-                                Image(systemName: isAPIKeyVisible ? "eye.slash" : "eye")
-                            }
-                            .accessibilityLabel(isAPIKeyVisible ? "Hide API key" : "Show API key")
+                    LabeledContent("API Base URL") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            TextField("API Base URL", text: $baseURL, prompt: Text("https://api.example.com/v1").foregroundStyle(.tertiary))
+                                .labelsHidden()
+                                .textFieldStyle(.roundedBorder)
+                            Text("Include the API version path when required, such as /v1.")
+                                .font(.caption2).foregroundStyle(.tertiary)
                         }
+                        .frame(minWidth: 340)
                     }
+                    Divider()
+                    LabeledContent("API Key") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                Group {
+                                    if isAPIKeyVisible {
+                                        TextField("API Key", text: $apiKey, prompt: Text("Enter API key").foregroundStyle(.tertiary))
+                                    } else {
+                                        SecureField("API Key", text: $apiKey, prompt: Text("Enter API key").foregroundStyle(.tertiary))
+                                    }
+                                }
+                                .labelsHidden()
+                                .textFieldStyle(.roundedBorder)
+                                Button { isAPIKeyVisible.toggle() } label: {
+                                    Image(systemName: isAPIKeyVisible ? "eye.slash" : "eye")
+                                }
+                                .buttonStyle(.borderless)
+                                .accessibilityLabel(isAPIKeyVisible ? "Hide API key" : "Show API key")
+                                .help(isAPIKeyVisible ? "Hide API key" : "Show API key")
+                            }
+                            Text("Stored only in your macOS Keychain after you save.")
+                                .font(.caption2).foregroundStyle(.tertiary)
+                        }
+                        .frame(minWidth: 340)
+                    }
+                    Divider()
                     HStack {
                         Button("Fetch Models") { Task { await viewModel.fetchModels(type: type, baseURL: baseURL, apiKey: apiKey) } }
                         Button("Test Connection") { Task { await viewModel.testConnection(type: type, baseURL: baseURL, apiKey: apiKey, modelID: modelDrafts.first?.modelID ?? "") } }
@@ -607,7 +636,7 @@ private struct ProviderEditor: View {
             }
         }
         .padding(28)
-        .frame(width: 650)
+        .frame(width: 720)
         .onDisappear { apiKey = "" }
         .alert("Model Configuration", isPresented: Binding(get: { validationMessage != nil }, set: { if !$0 { validationMessage = nil } })) {
             Button("OK", role: .cancel) { validationMessage = nil }
@@ -748,22 +777,31 @@ private struct ModelDraftFields: View {
                     ForEach(fetchedModels) { model in Text(model.displayName ?? model.id).tag(model.id) }
                 }
             }
-            TextField("Model ID", text: $draft.modelID, prompt: Text("gpt-4.1"))
-            TextField("Display name", text: $draft.displayName, prompt: Text("Optional"))
+            Divider()
+            ModelInputField(title: "Model ID", hint: "gpt-4.1", detail: "Required identifier sent to the provider.", text: $draft.modelID)
+            Divider()
+            ModelInputField(title: "Display name", hint: "Optional label", detail: "Friendly name shown in the app.", text: $draft.displayName)
+            Divider()
+            Text("Token limits").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             Grid(horizontalSpacing: 12, verticalSpacing: 8) {
                 GridRow {
-                    TextField("Context window", text: $draft.contextWindow)
-                    TextField("Max tokens", text: $draft.maxTokens)
-                }
-                GridRow {
-                    TextField("Input / 1M", text: $draft.inputPrice)
-                    TextField("Output / 1M", text: $draft.outputPrice)
-                }
-                GridRow {
-                    TextField("Cache read / 1M", text: $draft.cacheReadPrice)
-                    TextField("Cache write / 1M", text: $draft.cacheWritePrice)
+                    ModelInputField(title: "Context window", hint: "200000", detail: "Total context tokens.", text: $draft.contextWindow)
+                    ModelInputField(title: "Max tokens", hint: "32000", detail: "Maximum output tokens.", text: $draft.maxTokens)
                 }
             }
+            Divider()
+            Text("Pricing per 1M tokens").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Grid(horizontalSpacing: 12, verticalSpacing: 8) {
+                GridRow {
+                    ModelInputField(title: "Input", hint: "2 or 5e-1", detail: "Input token price.", text: $draft.inputPrice)
+                    ModelInputField(title: "Output", hint: "6", detail: "Output token price.", text: $draft.outputPrice)
+                }
+                GridRow {
+                    ModelInputField(title: "Cache read", hint: "0.5", detail: "Cached input read price.", text: $draft.cacheReadPrice)
+                    ModelInputField(title: "Cache write", hint: "0", detail: "Cached input write price.", text: $draft.cacheWritePrice)
+                }
+            }
+            Divider()
             VStack(alignment: .leading, spacing: 6) {
                 Text("Quick token presets").font(.caption.weight(.medium)).foregroundStyle(.secondary)
                 HStack(spacing: 6) {
@@ -780,6 +818,7 @@ private struct ModelDraftFields: View {
                 }
             }
             .controlSize(.small)
+            Divider()
             Text("Advanced capabilities").font(.caption.weight(.medium)).foregroundStyle(.secondary)
             HStack(spacing: 16) {
                 Toggle("Text", isOn: $draft.acceptsText)
@@ -794,6 +833,25 @@ private struct ModelDraftFields: View {
     }
 
     private func tokenLabel(_ value: Int) -> String { "\(value / 1_000)K" }
+}
+
+private struct ModelInputField: View {
+    let title: String
+    let hint: String
+    let detail: String
+    @Binding var text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.caption.weight(.medium)).foregroundStyle(.secondary)
+            TextField(title, text: $text, prompt: Text(hint).foregroundStyle(.tertiary))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: .infinity)
+            Text(detail).font(.caption2).foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 }
 
 private struct NewAPIChannelConnectionImporterView: View {
