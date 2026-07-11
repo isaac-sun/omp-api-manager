@@ -26,7 +26,7 @@
   <a href="https://github.com/isaac-sun/omp-api-manager/releases"><img src="https://img.shields.io/github/v/release/isaac-sun/omp-api-manager?display_name=tag" alt="最新版本"></a>
 </p>
 
-> **v0.2.1** 修复可下载的 v0.2.0 应用启动后立即闪退的问题。请从 [Releases](https://github.com/isaac-sun/omp-api-manager/releases) 下载替换后的 Apple Silicon DMG，或阅读 [v0.2.1 发布说明](docs/zh-CN/releases/v0.2.1.md)。DMG 使用 ad-hoc 签名，尚未经过 Developer ID 公证。
+> **v0.3.0** 新增私密、由用户主动触发的 **检查更新…** 流程：安全检查 GitHub 最新正式 Release，明确说明限流和失败原因，并跳转至官方 Release 页面手动安装。可从 [Releases](https://github.com/isaac-sun/omp-api-manager/releases) 下载 Apple Silicon DMG，或阅读 [v0.3.0 发布说明](docs/zh-CN/releases/v0.3.0.md)。DMG 使用 ad-hoc 签名，尚未经过 Developer ID 公证。
 
 ## 为什么使用 OMP API Manager？
 
@@ -42,6 +42,7 @@
 | 凭据保护 | 服务商密钥保存在 macOS Keychain；服务商元数据和高级编辑器均不会显示 API Key。 |
 | 本地网关 | 在 `127.0.0.1` 启动独立本地令牌的网关，从 Keychain 替换上游凭据，并转发普通响应与 SSE。 |
 | 私密用量面板 | 在 SQLite 保存脱敏请求元数据，并支持 CSV/JSON 导出；不会持久化提示词、响应、API Key 或授权头。 |
+| 手动检查更新 | 只在用户主动请求时检查 GitHub 最新正式 Release，并打开官方 Release 页面；不会自动下载或安装更新。 |
 | 原生 macOS 界面 | 提供环境状态、服务商、网关控制、用量和脱敏 `models.yml` 编辑器。 |
 
 ## 系统要求

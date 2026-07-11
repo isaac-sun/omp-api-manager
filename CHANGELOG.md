@@ -6,6 +6,8 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+## [0.3.0] - 2026-07-11
+
 ### Added
 
 - A standard macOS **Check for Updates…** command and Software Update settings for manually checking the latest stable GitHub Release.

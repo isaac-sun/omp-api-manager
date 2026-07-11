@@ -26,7 +26,7 @@
   <a href="https://github.com/isaac-sun/omp-api-manager/releases"><img src="https://img.shields.io/github/v/release/isaac-sun/omp-api-manager?display_name=tag" alt="Latest release"></a>
 </p>
 
-> **v0.2.1** fixes an immediate launch crash in the downloadable v0.2.0 app. Download the replacement Apple Silicon DMG from [Releases](https://github.com/isaac-sun/omp-api-manager/releases), or read the [v0.2.1 release notes](docs/releases/v0.2.1.md). The DMG is ad-hoc signed, not Developer ID notarized.
+> **v0.3.0** adds a private, user-initiated **Check for Updates…** workflow. It safely checks the latest stable GitHub Release, explains rate limits and failures, and opens the official release page for manual installation. Download the Apple Silicon DMG from [Releases](https://github.com/isaac-sun/omp-api-manager/releases), or read the [v0.3.0 release notes](docs/releases/v0.3.0.md). The DMG is ad-hoc signed, not Developer ID notarized.
 
 ## Why OMP API Manager?
 
@@ -42,6 +42,7 @@ Custom AI providers are useful, but manually editing OMP configuration can risk 
 | Credential protection | Stores provider keys in the macOS Keychain; no API key is saved in provider metadata or displayed by the advanced editor. |
 | Local gateway | Starts a `127.0.0.1`-only gateway with a separate local token, substitutes upstream Keychain credentials, and forwards standard and SSE responses. |
 | Private usage dashboard | Stores sanitized request metadata in SQLite and exports CSV or JSON. Prompts, responses, API keys, and authorization headers are never persisted. |
+| Manual update checks | Checks the latest stable GitHub Release only when requested, then opens the official release page. It never downloads or installs an update automatically. |
 | Native macOS UI | A SwiftUI workspace for environment status, providers, gateway controls, usage, and a redacted `models.yml` editor. |
 
 ## Requirements

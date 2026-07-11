@@ -6,8 +6,8 @@
 
 | Version | Supported |
 | --- | --- |
-| 0.2.x | Yes |
-| 0.1.x and earlier releases | No |
+| 0.3.x | Yes |
+| 0.2.x and earlier releases | No |
 
 ## Reporting a vulnerability
 
