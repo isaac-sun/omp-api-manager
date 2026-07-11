@@ -4,6 +4,7 @@ import OMPAPIManagerCore
 
 @main
 struct OMPAPIManagerApp: App {
+    @NSApplicationDelegateAdaptor(OMPApplicationDelegate.self) private var applicationDelegate
     @StateObject private var configurationViewModel = OMPConfigurationViewModel()
     @StateObject private var providerViewModel = ProviderManagementViewModel()
     @StateObject private var gatewayViewModel = GatewayViewModel()
@@ -13,6 +14,13 @@ struct OMPAPIManagerApp: App {
         WindowGroup("OMP API Manager") {
             ContentView(viewModel: configurationViewModel, providerViewModel: providerViewModel, gatewayViewModel: gatewayViewModel, usageViewModel: usageViewModel)
         }
+    }
+}
+
+private final class OMPApplicationDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
 
