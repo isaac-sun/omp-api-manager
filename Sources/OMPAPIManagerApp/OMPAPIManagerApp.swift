@@ -222,11 +222,16 @@ private struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
-                Label("Overview", systemImage: "gauge.with.dots.needle.50percent").tag(Section.overview)
-                Label("Providers", systemImage: "server.rack").tag(Section.providers)
-                Label("Usage", systemImage: "chart.bar.xaxis").tag(Section.usage)
-                Label("Configuration", systemImage: "doc.text").tag(Section.configuration)
+                SwiftUI.Section("Workspace") {
+                    Label("Overview", systemImage: "rectangle.3.group.fill").tag(Section.overview)
+                    Label("Providers", systemImage: "point.3.connected.trianglepath.dotted").tag(Section.providers)
+                    Label("Usage", systemImage: "chart.xyaxis.line").tag(Section.usage)
+                }
+                SwiftUI.Section("System") {
+                    Label("Configuration", systemImage: "slider.horizontal.3").tag(Section.configuration)
+                }
             }
+            .listStyle(.sidebar)
             .navigationTitle("OMP API Manager")
         } detail: {
             Group {
@@ -243,7 +248,8 @@ private struct ContentView: View {
             }
             .task { await viewModel.refresh() }
         }
-        .frame(minWidth: 860, minHeight: 540)
+        .tint(AppTheme.accent)
+        .frame(minWidth: 960, minHeight: 640)
     }
 }
 
@@ -251,29 +257,49 @@ private struct UsageView: View {
     @ObservedObject var viewModel: UsageDashboardViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Usage Today").font(.title2.weight(.semibold))
-            HStack(spacing: 12) {
-                metric("Requests", value: "\(viewModel.summary.requestCount)")
-                metric("Tokens", value: "\(viewModel.summary.totalTokens)")
-                metric("Errors", value: "\(viewModel.summary.errorCount)")
-                metric("Avg latency", value: "\(viewModel.summary.averageLatencyMilliseconds) ms")
-            }
-            List(viewModel.records) { record in
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text(record.modelID ?? record.providerID)
-                        Text("\(record.providerID) · \(record.source?.rawValue ?? "usage unavailable")")
-                            .font(.caption).foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                PageHeader(
+                    title: "Usage",
+                    subtitle: "Private, local request metadata from your gateway. Prompts and API keys are never stored.",
+                    icon: "chart.xyaxis.line"
+                )
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
+                    MetricCard(title: "Requests", value: "\(viewModel.summary.requestCount)", icon: "arrow.left.arrow.right", tint: AppTheme.accent)
+                    MetricCard(title: "Tokens", value: "\(viewModel.summary.totalTokens)", icon: "number", tint: .purple)
+                    MetricCard(title: "Errors", value: "\(viewModel.summary.errorCount)", icon: "exclamationmark.triangle", tint: viewModel.summary.errorCount == 0 ? .green : .orange)
+                    MetricCard(title: "Average latency", value: "\(viewModel.summary.averageLatencyMilliseconds) ms", icon: "timer", tint: .blue)
+                }
+
+                AppCard {
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Recent activity").font(.headline)
+                            Text("Most recent 100 gateway requests")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text("Today").font(.caption.weight(.medium)).foregroundStyle(.secondary)
                     }
-                    Spacer()
-                    Text(tokenText(for: record)).monospacedDigit()
-                    Text(statusText(for: record))
-                        .foregroundStyle(record.errorCategory == nil ? Color.secondary : Color.red)
+                    .padding(.bottom, 8)
+
+                    if viewModel.records.isEmpty {
+                        ContentUnavailableView("No usage yet", systemImage: "chart.line.uptrend.xyaxis", description: Text("Start the local gateway and send a request to see sanitized usage data here."))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 28)
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(viewModel.records) { record in
+                                UsageRow(record: record, tokens: tokenText(for: record), status: statusText(for: record))
+                                if record.id != viewModel.records.last?.id { Divider().padding(.leading, 52) }
+                            }
+                        }
+                    }
                 }
             }
+            .padding(28)
         }
-        .padding(24)
         .navigationTitle("Usage")
         .toolbar {
             Button("Refresh", systemImage: "arrow.clockwise") { Task { await viewModel.refresh() } }
@@ -286,16 +312,6 @@ private struct UsageView: View {
         .alert("Usage Error", isPresented: Binding(get: { viewModel.errorMessage != nil }, set: { if !$0 { viewModel.dismissError() } })) {
             Button("OK", role: .cancel) { viewModel.dismissError() }
         } message: { Text(viewModel.errorMessage ?? "") }
-    }
-
-    private func metric(_ title: String, value: String) -> some View {
-        VStack(alignment: .leading) {
-            Text(value).font(.title3.weight(.semibold)).monospacedDigit()
-            Text(title).font(.caption).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
     }
 
     private func tokenText(for record: GatewayUsageRecord) -> String {
@@ -324,27 +340,78 @@ private struct OverviewView: View {
     @ObservedObject var gatewayViewModel: GatewayViewModel
 
     var body: some View {
-        switch state {
-        case .loading:
-            ProgressView("Inspecting local OMP configuration…")
-        case .failed(let message):
-            ContentUnavailableView("OMP Not Available", systemImage: "exclamationmark.triangle", description: Text(message))
-        case .loaded(let snapshot):
-            VStack(alignment: .leading, spacing: 20) {
-                Label(snapshot.isWriteSupported ? "OMP 16.x configuration is supported" : "Read-only compatibility mode", systemImage: snapshot.isWriteSupported ? "checkmark.shield" : "eye.slash")
-                    .font(.title2.weight(.semibold))
-                Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 10) {
-                    GridRow { Text("OMP version").foregroundStyle(.secondary); Text(snapshot.installation.version) }
-                    GridRow { Text("Executable").foregroundStyle(.secondary); Text(snapshot.installation.executableURL.path).textSelection(.enabled) }
-                    GridRow { Text("Configuration").foregroundStyle(.secondary); Text(snapshot.installation.agentDirectory.path).textSelection(.enabled) }
-                    GridRow { Text("Default model").foregroundStyle(.secondary); Text(snapshot.defaultModel ?? "Not configured") }
-                    GridRow { Text("Gateway").foregroundStyle(.secondary); Text(gatewayViewModel.message) }
+        Group {
+            switch state {
+            case .loading:
+                ProgressView("Inspecting local OMP configuration…").controlSize(.large)
+            case .failed(let message):
+                ContentUnavailableView("OMP Not Available", systemImage: "exclamationmark.triangle", description: Text(message))
+            case .loaded(let snapshot):
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                    PageHeader(
+                        title: "Overview",
+                        subtitle: "Your local OMP environment at a glance.",
+                        icon: "rectangle.3.group.fill",
+                        status: snapshot.isWriteSupported ? "Ready to manage" : "Read-only"
+                    )
+
+                    AppCard {
+                        HStack(alignment: .top, spacing: 16) {
+                            Image(systemName: snapshot.isWriteSupported ? "checkmark.shield.fill" : "eye.slash.fill")
+                                .font(.title2).foregroundStyle(snapshot.isWriteSupported ? .green : .orange)
+                                .frame(width: 38, height: 38)
+                                .background((snapshot.isWriteSupported ? Color.green : Color.orange).opacity(0.12), in: RoundedRectangle(cornerRadius: 11))
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(snapshot.isWriteSupported ? "OMP 16.x is ready" : "Compatibility mode")
+                                    .font(.headline)
+                                Text(snapshot.isWriteSupported ? "Provider changes are safely applied with backups." : "You can inspect this installation, but edits remain disabled to protect your configuration.")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                    }
+
+                    HStack(alignment: .top, spacing: 16) {
+                        AppCard {
+                            Text("Environment").font(.headline)
+                            LabeledContent("OMP version", value: snapshot.installation.version)
+                            LabeledContent("Default model", value: snapshot.defaultModel ?? "Not configured")
+                            Divider().padding(.vertical, 3)
+                            DetailLine(label: "Executable", value: snapshot.installation.executableURL.path)
+                            DetailLine(label: "Configuration", value: snapshot.installation.agentDirectory.path)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                        AppCard {
+                            HStack {
+                                Text("Local gateway").font(.headline)
+                                Spacer()
+                                StatusPill(text: gatewayViewModel.status == nil ? "Stopped" : "Running", tint: gatewayViewModel.status == nil ? .secondary : .green)
+                            }
+                            Text(gatewayViewModel.message)
+                                .font(.subheadline).foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.top, 4)
+                            Text("Only localhost can reach the gateway. Usage records remain on this Mac.")
+                                .font(.caption).foregroundStyle(.secondary)
+                                .padding(.top, 4)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                    }
+
+                    if !snapshot.diagnostics.isEmpty {
+                        AppCard {
+                            Label("Diagnostics", systemImage: "exclamationmark.circle.fill").font(.headline)
+                            DiagnosticsList(messages: snapshot.diagnostics).padding(.top, 5)
+                        }
+                    }
+                    }
+                    .padding(28)
                 }
-                if !snapshot.diagnostics.isEmpty { DiagnosticsList(messages: snapshot.diagnostics) }
-                Spacer()
             }
-            .padding(28)
         }
+        .navigationTitle("Overview")
     }
 }
 
@@ -355,35 +422,37 @@ private struct ProvidersView: View {
     @State private var isPresentingEditor = false
 
     var body: some View {
-        Group {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                PageHeader(
+                    title: "Providers",
+                    subtitle: "Credentials are stored only in your macOS Keychain.",
+                    icon: "point.3.connected.trianglepath.dotted",
+                    status: "\(viewModel.providers.count) saved"
+                )
             if viewModel.providers.isEmpty {
-                ContentUnavailableView("No Saved Providers", systemImage: "server.rack", description: Text("Add an OpenAI- or Anthropic-compatible provider without exposing its API key."))
+                    AppCard {
+                        ContentUnavailableView("No saved providers", systemImage: "point.3.connected.trianglepath.dotted", description: Text("Add an OpenAI- or Anthropic-compatible provider. Its API key stays in your Keychain."))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 28)
+                        Button("Add your first provider", systemImage: "plus") { isPresentingEditor = true }
+                            .buttonStyle(.borderedProminent)
+                            .frame(maxWidth: .infinity)
+                    }
             } else {
-                List {
-                    ForEach(viewModel.providers) { provider in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(provider.displayName)
-                                Text("\(provider.id) · \(provider.type.rawValue)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
+                        ForEach(viewModel.providers) { provider in
+                            ProviderCard(provider: provider, gatewayViewModel: gatewayViewModel) {
+                                Task { await viewModel.delete(provider) }
                             }
-                            Spacer()
-                            if !provider.isEnabled { Text("Disabled").foregroundStyle(.secondary) }
-                            if gatewayViewModel.status == nil {
-                                Button("Start Gateway") { Task { await gatewayViewModel.start(for: provider) } }
-                            }
-                            Button(role: .destructive) { Task { await viewModel.delete(provider) } } label: {
-                                Image(systemName: "trash")
-                            }
-                            .accessibilityLabel("Delete \(provider.displayName)")
                         }
                     }
                 }
             }
+            .padding(28)
         }
         .navigationTitle("Providers")
-        .toolbar { Button("Add Provider", systemImage: "plus") { isPresentingEditor = true } }
+        .toolbar { Button("Add Provider", systemImage: "plus") { isPresentingEditor = true }.keyboardShortcut("n", modifiers: [.command]) }
         .task { await viewModel.refresh() }
         .sheet(isPresented: $isPresentingEditor) { ProviderEditor(viewModel: viewModel) }
         .alert("Provider Error", isPresented: Binding(get: { viewModel.errorMessage != nil }, set: { if !$0 { viewModel.dismissError() } })) {
@@ -406,39 +475,53 @@ private struct ProviderEditor: View {
     @State private var modelID = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Add Provider").font(.title2.weight(.semibold))
+        VStack(alignment: .leading, spacing: 20) {
+            PageHeader(
+                title: "Add provider",
+                subtitle: "Connect an OpenAI- or Anthropic-compatible endpoint.",
+                icon: "plus.circle.fill"
+            )
             Form {
-                TextField("Provider ID", text: $id, prompt: Text("acme"))
-                TextField("Display Name", text: $name, prompt: Text("Acme AI"))
-                Picker("Protocol", selection: $type) {
-                    ForEach(ProviderType.allCases, id: \.self) { option in
-                        Text(protocolLabel(option)).tag(option)
-                    }
-                }
-                TextField("API Base URL", text: $baseURL, prompt: Text("https://api.example.com/v1"))
-                SecureField("API Key", text: $apiKey)
-                HStack {
-                    Button("Fetch Models") { Task { await viewModel.fetchModels(type: type, baseURL: baseURL, apiKey: apiKey) } }
-                    Button("Test Connection") { Task { await viewModel.testConnection(type: type, baseURL: baseURL, apiKey: apiKey, modelID: modelID) } }
-                }
-                .disabled(viewModel.isConnecting)
-                if !viewModel.fetchedModels.isEmpty {
-                    Picker("Fetched Model", selection: $modelID) {
-                        Text("Select a model").tag("")
-                        ForEach(viewModel.fetchedModels) { model in
-                            Text(model.displayName ?? model.id).tag(model.id)
+                Section("Identity") {
+                    TextField("Provider ID", text: $id, prompt: Text("acme"))
+                    TextField("Display Name", text: $name, prompt: Text("Acme AI"))
+                    Picker("Protocol", selection: $type) {
+                        ForEach(ProviderType.allCases, id: \.self) { option in
+                            Text(protocolLabel(option)).tag(option)
                         }
                     }
                 }
-                TextField("Model ID", text: $modelID, prompt: Text("Enter manually if needed"))
-                if !viewModel.connectionMessage.isEmpty {
-                    Label(viewModel.connectionMessage, systemImage: "checkmark.circle")
-                        .font(.caption).foregroundStyle(.secondary)
+
+                Section("Connection") {
+                    TextField("API Base URL", text: $baseURL, prompt: Text("https://api.example.com/v1"))
+                    SecureField("API Key", text: $apiKey)
+                    HStack {
+                        Button("Fetch Models") { Task { await viewModel.fetchModels(type: type, baseURL: baseURL, apiKey: apiKey) } }
+                        Button("Test Connection") { Task { await viewModel.testConnection(type: type, baseURL: baseURL, apiKey: apiKey, modelID: modelID) } }
+                    }
+                    .disabled(viewModel.isConnecting)
+                    if viewModel.isConnecting { ProgressView().controlSize(.small) }
+                    if !viewModel.connectionMessage.isEmpty {
+                        Label(viewModel.connectionMessage, systemImage: "checkmark.circle.fill")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
-                Text("The API key is saved only in your macOS Keychain and is cleared from this form after success.")
-                    .font(.caption).foregroundStyle(.secondary)
+
+                Section("Default model") {
+                    if !viewModel.fetchedModels.isEmpty {
+                        Picker("Fetched Model", selection: $modelID) {
+                            Text("Select a model").tag("")
+                            ForEach(viewModel.fetchedModels) { model in
+                                Text(model.displayName ?? model.id).tag(model.id)
+                            }
+                        }
+                    }
+                    TextField("Model ID", text: $modelID, prompt: Text("Enter manually if needed"))
+                }
             }
+            .formStyle(.grouped)
+            Label("The API key is saved only in your macOS Keychain and is cleared from this form after success.", systemImage: "lock.fill")
+                .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Button("Cancel") { dismiss() }
                 Spacer()
@@ -449,8 +532,8 @@ private struct ProviderEditor: View {
                     .disabled(viewModel.isSaving)
             }
         }
-        .padding(24)
-        .frame(width: 520)
+        .padding(28)
+        .frame(width: 590)
     }
 
     private func save(apply: Bool) {
@@ -495,25 +578,57 @@ private struct ConfigurationDetail: View {
     @State private var isPresentingModelsEditor = false
 
     var body: some View {
-        Form {
-            Section("OMP") {
-                LabeledContent("Version", value: snapshot.installation.version)
-                LabeledContent("Write mode", value: snapshot.isWriteSupported ? "OMP 16.x adapter" : "Read-only")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                PageHeader(
+                    title: "Configuration",
+                    subtitle: "Inspect the local OMP files and manage advanced model definitions safely.",
+                    icon: "slider.horizontal.3",
+                    status: snapshot.isWriteSupported ? "Write enabled" : "Read-only"
+                )
+
+                HStack(alignment: .top, spacing: 16) {
+                    AppCard {
+                        Text("OMP installation").font(.headline)
+                        LabeledContent("Version", value: snapshot.installation.version)
+                        LabeledContent("Write mode", value: snapshot.isWriteSupported ? "OMP 16.x adapter" : "Read-only")
+                    }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    AppCard {
+                        Text("Configuration files").font(.headline)
+                        LabeledContent("config.yml", value: description(for: snapshot.configStatus))
+                        LabeledContent("models.yml", value: description(for: snapshot.modelsStatus))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+
+                AppCard {
+                    HStack(alignment: .top, spacing: 14) {
+                        Image(systemName: "doc.text.magnifyingglass")
+                            .foregroundStyle(AppTheme.accent).font(.title3)
+                            .frame(width: 34, height: 34)
+                            .background(AppTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Advanced models.yml editor").font(.headline)
+                            Text(isModelsFileEditable ? "Secrets are redacted in the editor. Existing secret references are preserved on save." : "models.yml must be valid and OMP 16.x must be detected before editing.")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 12)
+                        Button("Edit models.yml…") { isPresentingModelsEditor = true }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(!isModelsFileEditable)
+                    }
+                }
+
+                if !snapshot.diagnostics.isEmpty {
+                    AppCard {
+                        Label("Diagnostics", systemImage: "exclamationmark.circle.fill").font(.headline)
+                        DiagnosticsList(messages: snapshot.diagnostics).padding(.top, 5)
+                    }
+                }
             }
-            Section("Files") {
-                LabeledContent("config.yml", value: description(for: snapshot.configStatus))
-                LabeledContent("models.yml", value: description(for: snapshot.modelsStatus))
-            }
-            Section("Advanced") {
-                Button("Edit models.yml…") { isPresentingModelsEditor = true }
-                    .disabled(!isModelsFileEditable)
-                Text(isModelsFileEditable ? "Secrets are redacted in the editor. Existing secret references are preserved on save." : "models.yml must be valid and OMP 16.x must be detected before editing.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            if !snapshot.diagnostics.isEmpty { Section("Diagnostics") { DiagnosticsList(messages: snapshot.diagnostics) } }
+            .padding(28)
         }
-        .formStyle(.grouped)
         .navigationTitle("Configuration")
         .sheet(isPresented: $isPresentingModelsEditor) {
             ModelsYAMLEditor(modelsURL: snapshot.installation.modelsURL, canWrite: snapshot.isWriteSupported, providerViewModel: providerViewModel)
@@ -647,6 +762,183 @@ private struct DiagnosticsList: View {
                 Label(message, systemImage: "exclamationmark.circle")
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+}
+
+private enum AppTheme {
+    static let accent = Color(red: 0.43, green: 0.25, blue: 0.88)
+    static let surfaceBorder = Color.primary.opacity(0.09)
+}
+
+private struct PageHeader: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    var status: String? = nil
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: icon)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 48, height: 48)
+                .background(
+                    LinearGradient(colors: [AppTheme.accent, .blue], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+                )
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.title.weight(.bold))
+                Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 12)
+            if let status { StatusPill(text: status, tint: AppTheme.accent) }
+        }
+    }
+}
+
+private struct AppCard<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            content
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(AppTheme.surfaceBorder, lineWidth: 1)
+        }
+    }
+}
+
+private struct StatusPill: View {
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        Text(text)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(tint.opacity(0.12), in: Capsule())
+    }
+}
+
+private struct MetricCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let tint: Color
+
+    var body: some View {
+        AppCard {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundStyle(tint)
+                    .frame(width: 30, height: 30)
+                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+                Spacer()
+            }
+            Text(value).font(.title2.weight(.bold)).monospacedDigit()
+            Text(title).font(.subheadline).foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct DetailLine: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label).font(.caption.weight(.medium)).foregroundStyle(.secondary)
+            Text(value).font(.caption).textSelection(.enabled).lineLimit(2)
+        }
+    }
+}
+
+private struct UsageRow: View {
+    let record: GatewayUsageRecord
+    let tokens: String
+    let status: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: record.errorCategory == nil ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(record.errorCategory == nil ? .green : .orange)
+                .font(.title3)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(record.modelID ?? record.providerID).font(.subheadline.weight(.medium))
+                Text("\(record.providerID) · \(record.source?.rawValue ?? "usage unavailable")")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 3) {
+                Text("\(tokens) tokens").font(.subheadline.weight(.medium)).monospacedDigit()
+                Text(status)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(record.errorCategory == nil ? Color.secondary : Color.orange)
+            }
+        }
+        .padding(.vertical, 10)
+    }
+}
+
+private struct ProviderCard: View {
+    let provider: ProviderConfiguration
+    @ObservedObject var gatewayViewModel: GatewayViewModel
+    let delete: () -> Void
+
+    var body: some View {
+        AppCard {
+            HStack(alignment: .top) {
+                Image(systemName: provider.type == .anthropicCompatible || provider.type == .customAnthropicLike ? "bubble.left.and.bubble.right.fill" : "bolt.horizontal.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(AppTheme.accent)
+                    .frame(width: 38, height: 38)
+                    .background(AppTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 11))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(provider.displayName).font(.headline)
+                    Text(provider.id).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                StatusPill(text: provider.isEnabled ? "Enabled" : "Disabled", tint: provider.isEnabled ? .green : .secondary)
+            }
+            Divider()
+            DetailLine(label: "Endpoint", value: provider.baseURL.absoluteString)
+            DetailLine(label: "Protocol", value: protocolLabel(provider.type))
+            HStack {
+                if gatewayViewModel.status == nil {
+                    Button("Start gateway") { Task { await gatewayViewModel.start(for: provider) } }
+                        .buttonStyle(.bordered)
+                } else {
+                    Button("Stop gateway") { Task { await gatewayViewModel.stop() } }
+                        .buttonStyle(.bordered)
+                }
+                Spacer()
+                Button(role: .destructive, action: delete) {
+                    Image(systemName: "trash")
+                }
+                .accessibilityLabel("Delete \(provider.displayName)")
+            }
+        }
+    }
+
+    private func protocolLabel(_ type: ProviderType) -> String {
+        switch type {
+        case .openAICompatible: "OpenAI compatible"
+        case .anthropicCompatible: "Anthropic compatible"
+        case .customOpenAILike: "Custom OpenAI-like"
+        case .customAnthropicLike: "Custom Anthropic-like"
         }
     }
 }
