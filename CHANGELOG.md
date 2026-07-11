@@ -6,6 +6,14 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+## [0.2.1] - 2026-07-11
+
+### Fixed
+
+- Fixed the downloadable app crashing immediately at launch by loading the packaged icon from the standard app resources directory instead of invoking an unavailable SwiftPM `Bundle.module` path.
+- Redesigned provider and model form inputs with full-width editable controls, muted example text, per-field guidance, and visible row dividers.
+- Release packaging now starts the finished `.app` as a smoke test before creating the DMG.
+
 ## [0.2.0] - 2026-07-11
 
 ### Added

@@ -26,7 +26,7 @@
   <a href="https://github.com/isaac-sun/omp-api-manager/releases"><img src="https://img.shields.io/github/v/release/isaac-sun/omp-api-manager?display_name=tag" alt="Latest release"></a>
 </p>
 
-> **v0.2.0** adds secure `newapi_channel_conn` import, detailed multi-model configuration, selectable OMP API modes, and credential-safe provider duplication. Download the Apple Silicon DMG from [Releases](https://github.com/isaac-sun/omp-api-manager/releases), or read the [v0.2.0 release notes](docs/releases/v0.2.0.md). The DMG is ad-hoc signed, not Developer ID notarized.
+> **v0.2.1** fixes an immediate launch crash in the downloadable v0.2.0 app. Download the replacement Apple Silicon DMG from [Releases](https://github.com/isaac-sun/omp-api-manager/releases), or read the [v0.2.1 release notes](docs/releases/v0.2.1.md). The DMG is ad-hoc signed, not Developer ID notarized.
 
 ## Why OMP API Manager?
 
