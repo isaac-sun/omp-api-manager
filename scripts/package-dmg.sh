@@ -11,18 +11,22 @@ product_name="OMP API Manager"
 bundle_name="OMP API Manager.app"
 bundle_identifier="com.omp-api-manager"
 dist_dir="$root_dir/dist"
-app_dir="$dist_dir/$bundle_name"
-staging_dir="$dist_dir/dmg-staging"
-iconset_dir="$dist_dir/AppIcon.iconset"
 dmg_name="OMP-API-Manager-${version}-macos-${architecture}.dmg"
 dmg_path="$dist_dir/$dmg_name"
+work_dir="$(mktemp -d "${TMPDIR:-/private/tmp}/omp-api-manager.XXXXXX")"
+app_dir="$work_dir/$bundle_name"
+staging_dir="$work_dir/dmg-staging"
+iconset_dir="$work_dir/AppIcon.iconset"
+
+trap 'rm -rf "$work_dir"' EXIT
 
 if [[ "$architecture" != "arm64" && "$architecture" != "x86_64" ]]; then
   echo "Unsupported macOS architecture: $architecture" >&2
   exit 1
 fi
 
-rm -rf "$app_dir" "$staging_dir" "$iconset_dir" "$dmg_path" "$dmg_path.sha256"
+mkdir -p "$dist_dir"
+rm -f "$dmg_path" "$dmg_path.sha256"
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources" "$iconset_dir"
 
 swift build -c release
