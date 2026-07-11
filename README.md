@@ -15,7 +15,7 @@
   <a href="https://github.com/isaac-sun/omp-api-manager/releases"><img src="https://img.shields.io/github/v/release/isaac-sun/omp-api-manager?display_name=tag" alt="Latest release"></a>
 </p>
 
-> **v0.1.0** is the first developer release. It is currently distributed as source: open `Package.swift` in Xcode or run it with SwiftPM. Signed app bundles, notarization, a DMG, and Homebrew distribution are planned.
+> **v0.1.0** is the first developer release. Download the Apple Silicon DMG from [Releases](https://github.com/isaac-sun/omp-api-manager/releases), or open `Package.swift` in Xcode. The DMG is ad-hoc signed, not Developer ID notarized; see the release notes before opening it.
 
 ## Why OMP API Manager?
 
