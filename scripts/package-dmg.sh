@@ -16,6 +16,12 @@ if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
   exit 64
 fi
 
+declared_version="$(tr -d '[:space:]' < Sources/OMPAPIManagerApp/Resources/AppVersion.txt)"
+if [[ "$version" != "$declared_version" ]]; then
+  echo "Version $version does not match AppVersion.txt ($declared_version)." >&2
+  exit 64
+fi
+
 architecture="$(uname -m)"
 product_name="OMP API Manager"
 bundle_name="OMP API Manager.app"

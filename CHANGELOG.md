@@ -6,6 +6,17 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Added
+
+- A standard macOS **Check for Updates…** command and Software Update settings for manually checking the latest stable GitHub Release.
+- Strict semantic-version comparison with support for development builds, ETag reuse, request cooldowns, and clear update/error states.
+
+### Security
+
+- Update checks use an unauthenticated HTTPS request to a fixed GitHub API endpoint and never send OMP configuration, provider data, API keys, usage records, or a device identifier.
+- Release URLs are constructed locally from a validated stable tag; the app does not automatically download, mount, install, or execute updates while builds remain ad-hoc signed and unnotarized.
+- Release packaging no longer overwrites an existing asset with the same name.
+
 ## [0.2.0] - 2026-07-11
 
 ### Added

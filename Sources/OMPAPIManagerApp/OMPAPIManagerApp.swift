@@ -9,10 +9,23 @@ struct OMPAPIManagerApp: App {
     @StateObject private var providerViewModel = ProviderManagementViewModel()
     @StateObject private var gatewayViewModel = GatewayViewModel()
     @StateObject private var usageViewModel = UsageDashboardViewModel()
+    @StateObject private var softwareUpdateViewModel = SoftwareUpdateViewModel()
 
     var body: some Scene {
         WindowGroup("OMP API Manager") {
             ContentView(viewModel: configurationViewModel, providerViewModel: providerViewModel, gatewayViewModel: gatewayViewModel, usageViewModel: usageViewModel)
+        }
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    Task { await softwareUpdateViewModel.checkForUpdates(presentResult: true) }
+                }
+                .disabled(softwareUpdateViewModel.isChecking)
+            }
+        }
+
+        Settings {
+            SoftwareUpdateSettingsView(viewModel: softwareUpdateViewModel)
         }
     }
 }
