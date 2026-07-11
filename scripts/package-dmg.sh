@@ -4,8 +4,18 @@ set -euo pipefail
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root_dir"
 
-version="${1:-0.1.0}"
+if [[ $# -ne 1 ]]; then
+  echo "Usage: $0 <version>" >&2
+  exit 64
+fi
+
+version="$1"
 version="${version#v}"
+if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+  echo "Invalid version: $version" >&2
+  exit 64
+fi
+
 architecture="$(uname -m)"
 product_name="OMP API Manager"
 bundle_name="OMP API Manager.app"
@@ -105,7 +115,7 @@ ditto "$app_dir" "$staging_dir/$bundle_name"
 xattr -cr "$staging_dir/$bundle_name"
 ln -s /Applications "$staging_dir/Applications"
 hdiutil create -volname "$product_name" -srcfolder "$staging_dir" -ov -format UDZO "$dmg_path" >/dev/null
-shasum -a 256 "$dmg_path" > "$dmg_path.sha256"
+(cd "$dist_dir" && shasum -a 256 "$dmg_name" > "$dmg_name.sha256")
 
 echo "Created: $dmg_path"
 cat "$dmg_path.sha256"

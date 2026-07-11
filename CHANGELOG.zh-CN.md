@@ -6,9 +6,24 @@
 
 ## 未发布
 
+## [0.2.0] - 2026-07-11
+
 ### 新增
 
 - 安全导入 `newapi_channel_conn` JSON 连接：规范化 OpenAI `/v1` 基础 URL，API Key 仅保存到 Keychain。
+- 更详细的多模型服务商表单：支持模型名称、上下文与最大输出 Token、文本/图像输入能力、推理能力以及每百万 Token 价格。
+- 可选择的 OMP API 模式：OpenAI Completions、OpenAI Responses、Codex Responses、Azure OpenAI Responses 和 Anthropic Messages。
+- 服务商复制功能：复制端点和模型设置，但不复制凭据。
+- 模型 Token 快速预设、普通小数与科学计数法价格，以及 API Key 显示/隐藏控制，可更快完成服务商配置。
+
+### 安全
+
+- 导入的连接 JSON 仅在内存中解析，不会保存到服务商元数据、诊断信息或日志。
+- 复制后的服务商必须使用自己的 API Key，避免凭据意外带入新的服务商。
+
+### 修复
+
+- Release 校验文件现在使用可移植的 DMG 相对文件名，可直接通过 `shasum -a 256 -c` 验证。
 
 ## [0.1.0] - 2026-07-11
 

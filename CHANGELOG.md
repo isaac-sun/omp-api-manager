@@ -6,9 +6,24 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+## [0.2.0] - 2026-07-11
+
 ### Added
 
 - Safe import for `newapi_channel_conn` JSON connections, including OpenAI `/v1` base URL normalization and Keychain-only API key storage.
+- A detailed multi-model provider form with model names, context and output token limits, text/image input capabilities, reasoning support, and per-million-token pricing.
+- Selectable OMP API modes for OpenAI completions, OpenAI responses, Codex responses, Azure OpenAI responses, and Anthropic messages.
+- Provider duplication that copies endpoint and model settings without copying credentials.
+- Model token presets, decimal and scientific-notation pricing, and API-key visibility controls for faster provider setup.
+
+### Security
+
+- Imported connection JSON is parsed only in memory and is never saved to provider metadata, diagnostics, or logs.
+- Duplicated providers require their own API key, preventing credentials from being carried into a new provider accidentally.
+
+### Fixed
+
+- Release checksum files now use a portable relative DMG filename and can be verified directly with `shasum -a 256 -c`.
 
 ## [0.1.0] - 2026-07-11
 
